@@ -1,0 +1,9 @@
+[package]
+name = "k7"
+version = "0.1.0"
+edition = "2021"
+description = "K7 fantasy console core (display, audio, cartridge, API types)"
+
+[dependencies]
+bytemuck = { version = "1.14", features = ["derive"] }
+log = "0.4"

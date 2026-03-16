@@ -1,0 +1,3401 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=5, user-scalable=yes" />
+  <meta name="theme-color" content="#0f0f14" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>K7 Python in browser</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0f0f14;
+      --bg-raised: #16161d;
+      --bg-overlay: #1c1c26;
+      --bg-hover: #22222e;
+      --border: rgba(255,255,255,0.08);
+      --border-strong: rgba(255,255,255,0.12);
+      --text: #e8e8ed;
+      --text-muted: #9898a6;
+      --text-dim: #6c6c7a;
+      --accent: #5dd9a8;
+      --accent-dim: rgba(93,217,168,0.25);
+      --accent-text: #3db88a;
+      --accent-hit: #f0c050;
+      --accent-hit-dim: rgba(240,192,80,0.35);
+      --primary: #5dd9a8;
+      --primary-hover: #6ee5b4;
+      --radius: 8px;
+      --radius-sm: 6px;
+      --radius-lg: 12px;
+      --shadow: 0 4px 24px rgba(0,0,0,0.35);
+      --shadow-sm: 0 2px 8px rgba(0,0,0,0.2);
+      --font: 'DM Sans', system-ui, -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+      --space: 8px;
+      --space-lg: 16px;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 15px;
+      line-height: 1.5;
+      min-height: 100vh;
+      min-height: -webkit-fill-available;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: var(--space-lg) 1rem;
+      padding-left: max(1rem, env(safe-area-inset-left));
+      padding-right: max(1rem, env(safe-area-inset-right));
+      padding-bottom: max(var(--space-lg), env(safe-area-inset-bottom));
+      gap: var(--space-lg);
+      -webkit-font-smoothing: antialiased;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+      overflow-x: hidden;
+    }
+    .btn, .tabs button, #run, button[type="button"], a { -webkit-tap-highlight-color: transparent; }
+    #wrap, #k7canvas { touch-action: none; -webkit-user-select: none; user-select: none; }
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: var(--text);
+      margin: 0;
+    }
+    #wrap {
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      background: var(--bg-raised);
+      padding: 6px;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    canvas#k7canvas {
+      display: block;
+      width: 512px;
+      height: 512px;
+      background: #000;
+      border-radius: var(--radius-sm);
+    }
+    #status { font-size: 0.9rem; color: var(--text-muted); }
+    .panels {
+      width: 100%;
+      max-width: 920px;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+    .tabs {
+      display: flex;
+      gap: 2px;
+      padding: 0 2px 0 0;
+    }
+    .tabs button {
+      padding: 10px 18px;
+      font-family: var(--font);
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      cursor: pointer;
+      border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+      transition: color 0.15s, background 0.15s;
+    }
+    .tabs button:hover { color: var(--text); background: var(--bg-hover); }
+    .tabs button.active {
+      color: var(--accent);
+      background: var(--bg-raised);
+      border-bottom-color: var(--accent);
+    }
+    .tab-panel {
+      display: none;
+      flex-direction: column;
+      background: var(--bg-raised);
+      border: 1px solid var(--border);
+      border-radius: 0 var(--radius) var(--radius) var(--radius);
+      padding: var(--space-lg);
+      min-height: 680px;
+      box-shadow: var(--shadow-sm);
+    }
+    .tab-panel.active { display: flex; }
+    #code-editor {
+      width: 100%;
+      height: 640px;
+      min-height: 560px;
+      font-size: 14px;
+      border-radius: var(--radius-sm);
+    }
+    .editor-actions {
+      display: flex;
+      align-items: center;
+      gap: var(--space-lg);
+      margin-top: var(--space);
+      flex-wrap: wrap;
+    }
+    #run {
+      padding: 10px 20px;
+      font-family: var(--font);
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #0d0d0f;
+      background: var(--primary);
+      border: none;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+    }
+    #run:hover:not(:disabled) { background: var(--primary-hover); }
+    #run:active:not(:disabled) { transform: scale(0.98); }
+    #run:disabled { background: var(--bg-overlay); color: var(--text-dim); cursor: not-allowed; }
+    .btn {
+      padding: 8px 14px;
+      font-family: var(--font);
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--text);
+      background: var(--bg-overlay);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+    }
+    .btn:hover { background: var(--bg-hover); border-color: var(--border-strong); }
+    .btn-primary { background: var(--accent-dim); color: var(--accent); border-color: var(--accent); }
+    .btn-primary:hover { background: rgba(93,217,168,0.35); color: var(--primary-hover); }
+    .graphics-area { display: flex; flex-wrap: wrap; gap: var(--space-lg); align-items: flex-start; }
+    .pixel-editor-wrap { image-rendering: pixelated; image-rendering: crisp-edges; }
+    #pixel-editor {
+      display: block;
+      width: 256px;
+      height: 256px;
+      background: #000;
+      cursor: crosshair;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+    }
+    .palette { display: flex; flex-wrap: wrap; gap: 4px; max-width: 320px; }
+    .palette span {
+      width: 22px;
+      height: 22px;
+      border: 2px solid transparent;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: border-color 0.15s, transform 0.1s;
+    }
+    .palette span:hover { border-color: var(--border-strong); }
+    .palette span.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent-dim); }
+    .sound-grid { display: flex; flex-direction: column; gap: 2px; max-width: 640px; }
+    .sound-slot-row {
+      display: grid;
+      grid-template-columns: auto 100px 1fr auto;
+      gap: 10px;
+      align-items: center;
+      padding: 8px 12px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .sound-slot-row:hover { background: var(--bg-overlay); }
+    .sound-slot-row.selected { background: var(--bg-overlay); border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent-dim); }
+    .sound-grid .slot-num { color: var(--accent); font-family: var(--font-mono); font-weight: 500; width: 2em; }
+    .sound-grid input[type="text"] {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 8px 10px;
+    }
+    .sound-grid input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-dim); }
+    .sound-grid .play-btn { padding: 6px 12px; font-size: 12px; }
+    .sound-selected-hint { margin: var(--space) 0 0 0; color: var(--text-muted); font-size: 0.85rem; }
+    .sound-selected-hint code { color: var(--accent); font-size: 0.85em; }
+    .sound-pattern-wrap { margin-bottom: var(--space-lg); }
+    .sound-pattern-title { color: var(--accent); font-size: 0.9rem; font-weight: 600; margin-bottom: var(--space); }
+    .sound-pattern-strip { display: flex; gap: 6px; flex-wrap: wrap; max-width: 100%; }
+    .sound-step-cell {
+      width: 44px;
+      min-height: 54px;
+      background: var(--bg-overlay);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 6px;
+      transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+    }
+    .sound-step-cell:hover { border-color: var(--accent); background: var(--bg-hover); }
+    .sound-step-cell.rest { opacity: 0.55; }
+    .sound-step-cell.editing { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-dim); }
+    .sound-step-note { font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: var(--text); }
+    .sound-step-wave { font-size: 9px; color: var(--text-dim); margin-top: 2px; }
+    .sound-step-vol { width: 100%; height: 4px; background: var(--bg); border-radius: 2px; margin-top: 6px; overflow: hidden; }
+    .sound-step-vol-inner { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.1s; }
+    .sound-step-idx { font-size: 9px; color: var(--text-dim); margin-top: 4px; }
+    .sound-popover {
+      position: fixed;
+      background: var(--bg-raised);
+      border: 1px solid var(--accent);
+      border-radius: var(--radius);
+      padding: var(--space-lg);
+      z-index: 1000;
+      box-shadow: var(--shadow);
+      min-width: 220px;
+    }
+    .sound-popover-title { color: var(--accent); font-size: 0.85rem; font-weight: 600; margin-bottom: var(--space); }
+    .sound-note-keys { display: flex; flex-wrap: wrap; gap: 3px; margin-bottom: var(--space); }
+    .sound-note-key {
+      width: 28px;
+      height: 32px;
+      padding: 0;
+      font-size: 10px;
+      font-family: var(--font-mono);
+      background: var(--bg-overlay);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .sound-note-key:hover { background: var(--bg-hover); border-color: var(--border-strong); }
+    .sound-note-key.black { background: var(--bg); width: 20px; height: 22px; margin-left: -10px; margin-right: -10px; z-index: 1; }
+    .sound-wave-btns { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: var(--space); }
+    .sound-wave-btn {
+      padding: 6px 10px;
+      font-size: 10px;
+      font-family: var(--font-mono);
+      background: var(--bg-overlay);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+    .sound-wave-btn:hover, .sound-wave-btn.active { background: var(--accent-dim); color: var(--accent); border-color: var(--accent); }
+    .sound-vol-slider { width: 100%; margin: var(--space) 0; accent-color: var(--accent); }
+    .sound-wave-preview { display: block; width: 120px; height: 28px; background: var(--bg); border-radius: 4px; margin-bottom: var(--space); image-rendering: pixelated; }
+    .sound-effect-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: var(--space); }
+    .sound-effect-pill {
+      padding: 4px 10px;
+      font-size: 10px;
+      background: var(--bg-overlay);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+    .sound-effect-pill:hover { color: var(--text); background: var(--bg-hover); }
+    .sound-effect-pill.active { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+    .sound-pattern-actions { display: flex; align-items: center; gap: var(--space); flex-wrap: wrap; margin-bottom: var(--space); }
+    .sound-pattern-actions .btn { padding: 6px 12px; font-size: 11px; }
+    .sound-slot-preview { font-size: 11px; color: var(--text-dim); max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .sound-quick-insert { display: flex; flex-wrap: wrap; gap: var(--space); margin-bottom: var(--space); align-items: center; }
+    .sound-quick-insert .btn { padding: 6px 12px; font-size: 11px; }
+    .sound-panel-section { color: var(--accent); font-size: 0.875rem; font-weight: 600; margin: var(--space-lg) 0 var(--space) 0; }
+    .sfx-chain-editor-wrap { background: var(--bg-overlay); border-radius: var(--radius); padding: var(--space-lg); border: 1px solid var(--border); }
+    .sfx-chain-step-row { display: flex; align-items: center; gap: var(--space); padding: 8px 12px; background: var(--bg-raised); border-radius: var(--radius-sm); border: 1px solid var(--border); transition: background 0.15s, box-shadow 0.15s; }
+    .sfx-chain-step-row.playing { background: var(--accent-dim); box-shadow: 0 0 0 2px var(--accent); }
+    .sfx-chain-step-row .step-index { min-width: 20px; color: var(--text-dim); font-size: 0.8rem; font-family: var(--font-mono); }
+    .sound-piano-roll-wrap { margin-top: var(--space); }
+    .sound-piano-roll-title { color: var(--text-muted); font-size: 0.8rem; margin-bottom: 4px; }
+    .sound-piano-roll { display: grid; grid-template-columns: auto repeat(16, 1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; max-width: 100%; }
+    .sound-piano-roll .roll-cell { min-width: 18px; min-height: 14px; background: var(--bg-overlay); cursor: pointer; transition: background 0.1s; }
+    .sound-piano-roll .roll-cell:hover { background: var(--bg-hover); }
+    .sound-piano-roll .roll-cell.active { background: var(--accent); }
+    .sound-piano-roll .roll-cell.playing { box-shadow: inset 0 0 0 2px var(--accent); }
+    .sound-piano-roll .roll-cell.playing.playing-note { background: var(--accent-hit-dim); box-shadow: inset 0 0 0 2px var(--accent-hit); }
+    .sound-piano-roll .roll-cell.rest-row { background: var(--bg-raised); }
+    .sound-piano-roll .roll-label { font-size: 9px; color: var(--text-dim); padding: 2px 4px; display: flex; align-items: center; justify-content: flex-end; background: var(--bg-overlay); font-family: var(--font-mono); }
+    .sound-step-cell.playing { box-shadow: 0 0 0 2px var(--accent); }
+    .sound-step-cell.playing.playing-note { box-shadow: 0 0 0 2px var(--accent-hit); background: var(--accent-hit-dim); }
+    .sound-format-ref { margin-bottom: var(--space-lg); color: var(--text-muted); font-size: 0.85rem; }
+    .sound-format-ref summary { cursor: pointer; color: var(--accent); font-weight: 500; }
+    .sound-ref-inner { margin-top: var(--space); padding: var(--space-lg); background: var(--bg-overlay); border-radius: var(--radius-sm); border: 1px solid var(--border); }
+    .sound-ref-inner p { margin: 6px 0; }
+    .sound-ref-inner ul { margin: 6px 0 4px 1.2em; }
+    .sound-ref-inner code { font-family: var(--font-mono); font-size: 0.85em; background: var(--bg); padding: 2px 6px; border-radius: 4px; color: var(--text); }
+    .input-hint { font-size: 0.8rem; color: var(--text-dim); margin-top: var(--space); }
+    .llm-chat-bar { display: none; }
+    .llm-chat-bar.visible { display: flex; }
+    .sprite-editor-wrap { image-rendering: pixelated; image-rendering: crisp-edges; overflow: auto; max-width: 100%; }
+    #sprite-sheet-canvas { display: block; background: #000; cursor: pointer; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+    .sprite-hint { color: var(--text-muted); font-size: 0.85rem; margin-top: var(--space); }
+    .sprite-zoom-panel { margin-top: var(--space-lg); padding-top: var(--space-lg); border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: var(--space); }
+    .sprite-zoom-title { margin: 0; color: var(--text-muted); font-size: 0.9rem; display: flex; align-items: center; gap: var(--space); }
+    .sprite-zoom-title input { width: 3.5em; font-family: var(--font-mono); background: var(--bg-overlay); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 6px 8px; }
+    .sprite-tools { display: flex; gap: var(--space); flex-wrap: wrap; }
+    .sprite-tool-btn {
+      padding: 6px 12px;
+      font-size: 0.85rem;
+      background: var(--bg-overlay);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+    .sprite-tool-btn:hover { color: var(--text); background: var(--bg-hover); }
+    .sprite-tool-btn.active { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+    .sprite-zoom-wrap { image-rendering: pixelated; image-rendering: crisp-edges; }
+    #sprite-zoom-canvas { display: block; width: 128px; height: 128px; background: #000; cursor: crosshair; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+    .sprite-picker-row { display: flex; align-items: center; gap: var(--space); margin-bottom: var(--space); flex-wrap: wrap; }
+    .sprite-picker-row label { color: var(--text-muted); font-size: 0.9rem; }
+    .sprite-picker-strip { display: flex; gap: 3px; flex-wrap: wrap; max-width: 100%; }
+    .sprite-picker-strip canvas { display: block; width: 16px; height: 16px; image-rendering: pixelated; cursor: pointer; border: 1px solid var(--border); border-radius: 3px; transition: border-color 0.15s; }
+    .sprite-picker-strip canvas:hover { border-color: var(--accent); }
+    .sprite-picker-strip canvas.selected { border-color: var(--accent); border-width: 2px; }
+    .sprite-picker-nav { padding: 6px 12px; font-size: 0.9rem; }
+    .sprite-picker-range { color: var(--text-dim); font-size: 0.85rem; }
+    .map-editor-wrap { image-rendering: pixelated; image-rendering: crisp-edges; overflow: auto; max-width: 100%; max-height: 360px; }
+    #map-canvas { display: block; background: var(--bg); cursor: crosshair; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+    .map-hint { color: var(--text-muted); font-size: 0.85rem; margin-top: var(--space); }
+    .editor-toolbar { margin-bottom: var(--space); display: flex; align-items: center; gap: var(--space); flex-wrap: wrap; }
+    .editor-toolbar label { color: var(--text-muted); font-size: 0.9rem; }
+    .tab-panel > p:first-of-type { margin: 0 0 var(--space) 0; color: var(--text-muted); font-size: 0.9rem; }
+    select, input[type="number"], input[type="text"] {
+      font-family: var(--font);
+      font-size: 0.9rem;
+      color: var(--text);
+      background: var(--bg-overlay);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 8px 10px;
+    }
+    select:focus, input:focus { outline: none; border-color: var(--accent); }
+    details summary { font-weight: 500; }
+    #profiler-overlay {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      padding: 6px 10px;
+      background: rgba(15,15,20,0.92);
+      color: var(--accent);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      pointer-events: none;
+      box-shadow: var(--shadow-sm);
+    }
+    #cheat-sheet-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      overflow: auto;
+      padding: var(--space-lg);
+      background: rgba(15,15,20,0.9);
+      backdrop-filter: blur(6px);
+    }
+    #cheat-sheet-modal > div {
+      max-width: 720px;
+      margin: 0 auto;
+      background: var(--bg-raised);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: var(--space-lg);
+      color: var(--text);
+      font-size: 0.9rem;
+      line-height: 1.6;
+      box-shadow: var(--shadow);
+    }
+    #cheat-sheet-modal h2 { margin: 0 0 var(--space-lg) 0; color: var(--accent); font-size: 1.25rem; font-weight: 600; }
+    #cheat-sheet-modal h3 { color: var(--text); font-size: 0.95rem; margin: var(--space-lg) 0 var(--space) 0; }
+    #cheat-sheet-modal pre { margin: 0; background: var(--bg); padding: var(--space); border-radius: var(--radius-sm); overflow-x: auto; font-size: 12px; font-family: var(--font-mono); border: 1px solid var(--border); }
+    #cheat-sheet-modal code { font-family: var(--font-mono); font-size: 0.85em; }
+    #cheat-sheet-modal p { margin: 0; color: var(--text-muted); }
+    #cheat-sheet-modal section { margin-bottom: 1rem; }
+    #cheat-sheet-modal .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-lg); }
+    body > .page-header { flex-shrink: 0; margin-bottom: var(--space); padding-bottom: 0; }
+    .editor-layout { display: flex; flex-direction: column; gap: 0; flex: 1; min-width: 0; max-width: 1800px; width: 100%; margin: 0 auto; padding: 0; align-items: stretch; min-height: 0; background: var(--bg-raised); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow-sm); }
+    .layout-top-bar { display: flex; flex-direction: row; align-items: stretch; flex-shrink: 0; background: transparent; border-bottom: 1px solid var(--border); padding: 0; }
+    .layout-top-bar .tabs { flex: 1; margin: 0; padding: var(--space) var(--space) 0; border: none; border-radius: 0; background: transparent; }
+    .layout-top-bar .output-toolbar { flex: 0 0 auto; display: flex; align-items: center; padding: var(--space); margin: 0; margin-left: auto; border-left: 1px solid var(--border); background: transparent; }
+    .layout-top-bar .btn-arrow { min-width: 2rem; padding: var(--space) 10px; font-size: 1rem; line-height: 1; }
+    .layout-main { display: flex; flex-direction: row; flex: 1; min-height: 0; min-width: 0; background: var(--bg-raised); }
+    .editor-side { flex: 1 1 70%; min-width: 380px; max-width: 1200px; display: flex; flex-direction: column; padding: 0; background: var(--bg-raised); overflow: hidden; }
+    .editor-side .panels { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; margin: 0 0 var(--space) 0; max-width: none; border: none; border-radius: 0; box-shadow: none; background: transparent; border-right: 1px solid var(--border); }
+    .editor-side .tab-panel { flex: 1; overflow-y: auto; margin: 0; border-radius: 0; border: none; box-shadow: none; }
+    .output-side { flex: 0 1 30%; min-width: 320px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: var(--space-lg) var(--space) var(--space) var(--space); background: var(--bg-raised); }
+    .output-toolbar { width: auto; flex-shrink: 0; }
+    .output-side #wrap { flex-shrink: 0; margin: 0 auto; }
+    .output-side #status { margin-top: var(--space); width: 100%; max-width: 524px; flex-shrink: 0; }
+    .output-side .input-hint { margin-top: var(--space); width: 100%; max-width: 524px; flex-shrink: 0; }
+    .editor-side #panel-code.tab-panel.active { display: flex; flex-direction: column; }
+    .editor-side #panel-code #code-editor { flex: 1; min-height: 560px; }
+    body.canvas-only .editor-side { display: none !important; }
+    body.canvas-only .layout-top-bar .tabs { display: none; }
+    body.canvas-only .editor-layout { max-width: none; }
+    body.canvas-only .output-side { flex: 1 1 100%; align-items: center; padding: var(--space-lg); border: none; }
+    body.canvas-only .output-side #wrap { margin: 0 auto; }
+    body.player-mode .layout-top-bar { display: none !important; }
+    .page-header { text-align: center; margin-bottom: var(--space-lg); }
+    .page-header .logo { display: block; max-width: 100%; width: 280px; height: auto; margin: 0 auto; image-rendering: pixelated; image-rendering: crisp-edges; }
+    .page-header .tagline { margin: var(--space) 0 0 0; font-size: 0.95rem; color: var(--text-muted); font-weight: 500; }
+    body.player-mode .page-header { display: none; }
+    body.player-mode .panels { display: none; }
+    body.player-mode .output-toolbar { display: none; }
+    body.player-mode #status { display: none; }
+    body.player-mode .input-hint { display: none; }
+
+    /* Mobile & touch */
+    @media (max-width: 768px) {
+      body { padding: var(--space) 0.5rem; padding-bottom: max(var(--space), env(safe-area-inset-bottom)); }
+      .editor-layout { flex-direction: column; padding: 0 var(--space); min-height: auto; align-items: stretch; }
+      .layout-main { flex-direction: column; }
+      .editor-side { width: 100%; min-width: 0; max-width: none; }
+      .editor-side .panels { margin: 0; border-right: none; border-bottom: 1px solid var(--border); }
+      .output-side { width: 100%; min-width: 0; padding: var(--space); }
+      .page-header .logo { width: min(280px, 85vw); }
+      #wrap { max-width: 100%; }
+      canvas#k7canvas { width: 100%; max-width: 100vw; height: auto; aspect-ratio: 1; }
+      .panels { max-width: 100%; padding: 0 2px; }
+      .tabs { overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; scrollbar-width: none; flex-wrap: nowrap; padding-bottom: 2px; }
+      .tabs::-webkit-scrollbar { display: none; }
+      .tabs button { padding: 12px 14px; min-width: 0; font-size: 0.85rem; white-space: nowrap; }
+      .tab-panel { padding: var(--space); min-height: 280px; border-radius: 0 var(--radius-sm) var(--radius-sm) var(--radius-sm); overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      #code-editor { height: 280px; min-height: 220px; font-size: 13px; }
+      .editor-actions { gap: var(--space); }
+      #run, .btn { padding: 10px 16px; min-height: 44px; min-width: 44px; }
+      .sound-pattern-actions { flex-wrap: wrap; gap: var(--space); }
+      .sound-slot-row { grid-template-columns: auto 1fr auto; }
+      .sound-slot-row .sound-slot-preview { display: none; }
+      .sound-step-cell { width: 40px; min-height: 48px; padding: 4px; }
+      .sound-piano-roll .roll-cell { min-width: 14px; min-height: 12px; }
+      .sound-piano-roll .roll-label { font-size: 8px; padding: 1px 2px; }
+      .graphics-area { flex-direction: column; align-items: stretch; }
+      #pixel-editor { max-width: 100%; }
+      .palette span { width: 28px; height: 28px; }
+      .sfx-chain-editor-wrap .sound-pattern-title { font-size: 0.85rem; }
+      .sfx-chain-step-row { padding: 10px 12px; }
+      #cheat-sheet-modal > div { max-width: 95vw; margin: 0.5rem; padding: var(--space); }
+    }
+    @media (max-width: 480px) {
+      body { padding-left: max(0.5rem, env(safe-area-inset-left)); padding-right: max(0.5rem, env(safe-area-inset-right)); }
+      h1 { font-size: 1.25rem; }
+      .tabs button { padding: 10px 12px; font-size: 0.8rem; }
+      .sound-slot-row { grid-template-columns: 1fr auto; gap: 6px; }
+      .sound-slot-row .slot-num { width: auto; }
+      .sound-pattern-strip { gap: 4px; }
+      .sound-step-cell { width: 36px; min-height: 44px; font-size: 10px; }
+      .sound-quick-insert .btn, .sound-pattern-actions .btn { padding: 8px 10px; font-size: 0.8rem; }
+      .editor-actions label { font-size: 0.85rem; }
+    }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.7/ace.js"></script>
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js"></script>
+  <script src="deps/gifshot.min.js"></script>
+</head>
+<body>
+  <header class="page-header">
+    <img src="logo.png" alt="K7" class="logo" width="280" height="auto" />
+    <p class="tagline">K7 + Python (Pyodide)</p>
+  </header>
+  <div class="editor-layout">
+    <div class="layout-top-bar">
+      <div class="tabs">
+        <button type="button" data-tab="code" class="active">Code</button>
+        <button type="button" data-tab="graphics">Graphics</button>
+        <button type="button" data-tab="sounds">Sounds</button>
+        <button type="button" data-tab="sprites">Sprites</button>
+        <button type="button" data-tab="map">Map</button>
+      </div>
+      <div class="output-toolbar">
+        <button type="button" id="canvas-only-toggle" class="btn btn-arrow" title="Toggle editor panel (show only K7 output)" aria-label="Toggle editor">◀</button>
+      </div>
+    </div>
+    <div class="layout-main">
+    <aside class="editor-side" id="editor-side">
+  <div class="panels">
+    <div id="panel-code" class="tab-panel active">
+      <div id="code-editor"></div>
+      <div class="editor-actions">
+        <button type="button" id="run" disabled>Run</button>
+        <button type="button" id="pause-btn" class="btn" disabled title="Pause game (P)">Pause</button>
+        <label style="display:inline-flex;align-items:center;gap:4px;color:var(--text-muted);font-size:0.9rem;"><input type="checkbox" id="hot-reload" /> Hot reload</label>
+        <span style="margin-left:12px;color:var(--text-muted);font-size:0.9rem;">Replay:</span>
+        <button type="button" id="replay-record" class="btn" title="Start recording input">Record</button>
+        <button type="button" id="replay-stop" class="btn" style="display:none;" title="Stop recording">Stop</button>
+        <button type="button" id="replay-play" class="btn" title="Play back recorded input" disabled>Play</button>
+        <button type="button" id="replay-export-gif" class="btn" title="Download recording as GIF (video)">Export GIF</button>
+        <button type="button" id="replay-import" class="btn" title="Load input replay from JSON">Import</button>
+        <input type="file" id="replay-file" accept=".json" style="display:none;" />
+        <span id="replay-status" style="margin-left:6px;color:#8c8;font-size:0.85rem;"></span>
+        <label style="display:inline-flex;align-items:center;gap:4px;color:#aaa;font-size:0.9rem;"><input type="checkbox" id="profiler-toggle" /> Profiler</label>
+        <button type="button" id="cheat-sheet-btn" class="btn">Cheat sheet</button>
+        <button type="button" id="share-game-btn" class="btn" title="Encode full game (code, sounds, map, sprites) into URL">Share game</button>
+        <label for="example-select" style="color:var(--text-muted);font-size:0.9rem;">Example:</label>
+        <select id="example-select" class="btn" style="padding:0.35rem 0.5rem;">
+          <option value="default">Default</option>
+          <option value="showcase">Showcase (90s demo)</option>
+          <option value="mouse">Mouse demo</option>
+          <option value="multiplayer">Multiplayer (matchmaking)</option>
+          <option value="shared_drawing">Shared drawing (multiplayer)</option>
+          <option value="plasma">Plasma</option>
+          <option value="fonts">Fonts (pico8, bbc, appleii, cbmii, trollmini)</option>
+          <option value="rgba">RGBA (32-bit colors + transparency)</option>
+          <option value="ski">Ski (avoid trees)</option>
+          <option value="flappy">Flappy</option>
+          <option value="fireworks">Fireworks</option>
+          <option value="flock">Flock</option>
+          <option value="ghostmark">Ghostmark (benchmark)</option>
+          <option value="snake">Snake</option>
+          <option value="sprites">Sprite demo</option>
+          <option value="mapscroll">Map scroll</option>
+          <option value="tilemap_demo">Tilemap flags (flip/rotate)</option>
+          <option value="palettes_demo">Palettes (pico8, gameboy, cga…)</option>
+          <option value="pong">Pong</option>
+          <option value="breakout">Breakout</option>
+          <option value="platformer">Platformer</option>
+          <option value="ravetunnel">Rave Tunnel</option>
+          <option value="kaleidoscope">Trippy Kaleidoscope</option>
+          <option value="hypnospiral">Hypno Spiral</option>
+          <option value="rasterbars">Raster Bars</option>
+          <option value="scroller">Scroller</option>
+          <option value="phrack_demo">Phrack (terminal / CFP)</option>
+          <option value="fire">Fire</option>
+          <option value="audiotest">Audio test (all features)</option>
+          <option value="llm_demo">LLM (OpenAI-compatible API)</option>
+          <option value="sequencer">Sequence8-style sequencer</option>
+          <option value="sable">Sable (falling sand)</option>
+        </select>
+        <button type="button" id="load-demo-btn" class="btn" title="Load the showcase demo (index.html demo) into the editor to debug">Load demo</button>
+        <div id="multiplayer-matchmaking" style="display:none; margin-top:8px; padding:8px; background:#1e1e2a; border-radius:6px;">
+          <span style="color:#8c8;">Matchmaking:</span>
+          <button type="button" id="multiplayer-create" class="btn" style="margin-left:8px;">Create room</button>
+          <span style="margin-left:12px;">Join:</span>
+          <input type="text" id="multiplayer-join-code" placeholder="CODE" maxlength="8" style="width:72px; margin-left:4px; background:#2a2a3e; color:#eee; border:1px solid #444; border-radius:4px; padding:4px; font-size:12px; text-transform:uppercase;" />
+          <button type="button" id="multiplayer-join" class="btn">Join room</button>
+          <span id="multiplayer-room-display" style="margin-left:8px; color:#cf8;"></span>
+          <button type="button" id="multiplayer-room-link" class="btn" style="display:none; margin-left:8px;">Copy room link</button>
+        </div>
+      </div>
+    </div>
+    <div id="panel-graphics" class="tab-panel">
+      <div class="graphics-area">
+        <div class="pixel-editor-wrap">
+          <canvas id="pixel-editor" width="128" height="128"></canvas>
+        </div>
+        <div>
+          <p style="margin:0 0 6px 0; color:var(--text-muted); font-size:0.9rem;">Palette (click to select, draw on canvas)</p>
+          <label style="display:inline-flex;align-items:center;gap:6px;margin-bottom:6px;font-size:0.9rem;color:var(--text-muted);">Built-in: <select id="palette-select" style="background:#2a2a3e;color:#eee;border:1px solid #444;border-radius:4px;padding:4px;font-size:12px;"></select></label>
+          <div id="palette" class="palette"></div>
+          <button type="button" id="copy-to-k7" class="btn btn-primary" style="margin-top:10px;">Copy to K7 screen</button>
+          <button type="button" id="clear-gfx" class="btn" style="margin-top:6px;">Clear</button>
+        </div>
+      </div>
+    </div>
+    <div id="panel-sounds" class="tab-panel">
+      <p>Sound editor: 16 slots. Click a row to select — <strong>Space</strong> to test. Edit in pattern (steps) or text. Use in code: <code>k7.set_sound(id, "c4 e4 g4")</code>, <code>k7.sfx(id)</code>.</p>
+      <div class="sound-panel-section">Slots 0–15</div>
+      <div id="sound-editor-grid" class="sound-grid"></div>
+      <p id="sound-selected-hint" class="sound-selected-hint">Selected: 0 — <code>k7.sfx(0)</code> · Space to test</p>
+      <div class="sound-panel-section">Pattern — slot <span id="sound-pattern-slot-num">0</span></div>
+      <div id="sound-pattern-wrap" class="sound-pattern-wrap">
+        <div class="sound-quick-insert">
+          <span style="color:var(--text-dim);font-size:0.85rem;">Quick insert:</span>
+          <button type="button" id="sound-insert-chord" class="btn" title="Append C major chord">C chord</button>
+          <button type="button" id="sound-insert-arpeggio" class="btn" title="Append arpeggio">Arpeggio</button>
+          <button type="button" id="sound-insert-scale" class="btn" title="Append C scale">Scale</button>
+          <button type="button" id="sound-insert-rests" class="btn" title="Append 4 rests">Rest×4</button>
+        </div>
+        <div class="sound-pattern-actions">
+          <label>From step:</label>
+          <input type="number" id="sound-play-from-step" min="0" max="15" value="0" style="width:36px;background:#2a2a3e;color:#eee;border:1px solid #444;border-radius:4px;padding:2px 4px;font-size:12px;" />
+          <label style="display:inline-flex;align-items:center;gap:4px;"><input type="checkbox" id="sound-play-loop" /> Loop</label>
+          <button type="button" id="sound-play-pattern" class="btn" title="Play pattern from step">Play</button>
+          <button type="button" id="sound-stop-pattern" class="btn" title="Stop playback" style="display:none;">Stop</button>
+          <button type="button" id="sound-copy-slot" class="btn" title="Copy slot to clipboard">Copy</button>
+          <button type="button" id="sound-paste-slot" class="btn" title="Paste from clipboard">Paste</button>
+          <button type="button" id="sound-clear-slot" class="btn" title="Clear this slot">Clear slot</button>
+          <label style="color:#888;font-size:0.8rem;">Duplicate to:</label>
+          <select id="sound-duplicate-to" style="width:44px;background:#2a2a3e;color:#eee;border:1px solid #444;border-radius:4px;padding:2px 4px;font-size:12px;">
+            <option value="">—</option>
+          </select>
+        </div>
+        <div id="sound-pattern-strip" class="sound-pattern-strip"></div>
+        <div class="sound-piano-roll-wrap">
+          <div class="sound-piano-roll-title">Visual editor (piano roll) — click a cell to set note for that step</div>
+          <div id="sound-piano-roll" class="sound-piano-roll"></div>
+        </div>
+        <div id="sound-popover" class="sound-popover" style="display:none;">
+          <div class="sound-popover-title">Edit step <span id="sound-popover-step-num">0</span></div>
+          <canvas id="sound-wave-preview" class="sound-wave-preview" width="120" height="28" title="Waveform preview"></canvas>
+          <div id="sound-popover-note-keys" class="sound-note-keys"></div>
+          <label style="font-size:0.8rem;color:#aaa;">Instrument (core)</label>
+          <select id="sound-popover-instrument" class="sound-instrument-select" style="width:100%;margin-bottom:6px;background:#2a2a3e;color:#eee;border:1px solid #444;border-radius:4px;padding:4px;font-size:12px;">
+            <option value="">— waveform only —</option>
+          </select>
+          <div class="sound-wave-btns">
+            <button type="button" class="sound-wave-btn" data-wave="sine">sine</button>
+            <button type="button" class="sound-wave-btn" data-wave="triangle">tri</button>
+            <button type="button" class="sound-wave-btn active" data-wave="square">sq</button>
+            <button type="button" class="sound-wave-btn" data-wave="sawtooth">saw</button>
+            <button type="button" class="sound-wave-btn" data-wave="noise">noise</button>
+          </div>
+          <div class="sound-effect-pills" id="sound-popover-effects"></div>
+          <label style="font-size:0.8rem;color:#aaa;">Volume <span id="sound-popover-vol-val">100</span>%</label>
+          <input type="range" id="sound-popover-vol" class="sound-vol-slider" min="0" max="100" value="100" />
+          <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
+            <button type="button" id="sound-popover-play-here" class="btn" title="Play from this step">Play from here</button>
+            <button type="button" id="sound-popover-rest" class="btn">Rest</button>
+            <button type="button" id="sound-popover-done" class="btn btn-primary">Done</button>
+          </div>
+        </div>
+      </div>
+      <details class="sound-format-ref">
+        <summary>Format &amp; effects reference</summary>
+        <div class="sound-ref-inner">
+          <p><strong>Notes:</strong> c4 d4 e4 f4 g4 a4 b4 c5 (# or b = sharp/flat). Rest: <code>-</code> or <code>r</code>.</p>
+          <p><strong>Volume</strong> (per note): <code>c4@100</code> (full), <code>c4@50</code> (half). Range 0–100.</p>
+          <p><strong>Waveform</strong> (after <code>:</code>): <code>sine</code> <code>square</code> <code>triangle</code> <code>sawtooth</code> <code>noise</code>. <code>layer:sine:0.4,tri:0.3,sq:0.1</code> = blend layers.</p>
+          <p><strong>Instruments</strong> (survie-style): <code>note:category:preset</code>. e.g. <code>c4:piano:bright</code> <code>e4:chip:pulse</code> <code>g4:pluck:soft</code>. Categories: piano, lead, bass, chip, pluck, pad, drums (each with presets: bright, dark, pulse, saw, etc.).</p>
+          <p><strong>Effects</strong> (after <code>|</code>): <code>lowpass</code> <code>highpass</code> <code>echo</code> <code>reverb</code> <code>envelope</code> <code>tremolo</code> <code>distortion</code> (with presets or params).</p>
+          <p><strong>Examples:</strong> <code>c4@100 e4@80 g4@60</code> &nbsp; <code>c4:piano:bright</code> &nbsp; <code>e4:chip:pulse|echo:short</code> &nbsp; <code>c4:sine|reverb:small</code></p>
+          <details style="margin-top:10px;">
+            <summary style="cursor:pointer;color:#8cf;">Pattern examples — click Insert to paste into selected slot</summary>
+            <ul style="margin:6px 0 4px 1.2em;padding:0;list-style:none;">
+              <li><strong>Melody:</strong> <code>c4 e4 g4 c5 e4 g4 c5 e5</code> <button type="button" class="btn sound-insert-example" data-insert="c4 e4 g4 c5 e4 g4 c5 e5" style="margin-left:6px;padding:2px 6px;font-size:10px;">Insert</button></li>
+              <li><strong>Chord:</strong> <code>c4 e4 g4</code> <button type="button" class="btn sound-insert-example" data-insert="c4 e4 g4" style="margin-left:6px;padding:2px 6px;font-size:10px;">Insert</button></li>
+              <li><strong>Arpeggio:</strong> <code>c4|envelope:pluck e4|envelope:pluck g4|envelope:pluck c5|envelope:pluck</code> <button type="button" class="btn sound-insert-example" data-insert="c4|envelope:pluck e4|envelope:pluck g4|envelope:pluck c5|envelope:pluck" style="margin-left:6px;padding:2px 6px;font-size:10px;">Insert</button></li>
+              <li><strong>Crescendo:</strong> <code>c4@30 e4@50 g4@70 c5@100</code> <button type="button" class="btn sound-insert-example" data-insert="c4@30 e4@50 g4@70 c5@100" style="margin-left:6px;padding:2px 6px;font-size:10px;">Insert</button></li>
+              <li><strong>Staccato:</strong> <code>cq4 eq4 gq4 cq5</code> <button type="button" class="btn sound-insert-example" data-insert="cq4 eq4 gq4 cq5" style="margin-left:6px;padding:2px 6px;font-size:10px;">Insert</button></li>
+              <li><strong>Piano:</strong> <code>c4:piano:bright e4:piano:bright g4:piano:bright</code> <button type="button" class="btn sound-insert-example" data-insert="c4:piano:bright e4:piano:bright g4:piano:bright" style="margin-left:6px;padding:2px 6px;font-size:10px;">Insert</button></li>
+            </ul>
+          </details>
+        </div>
+      </details>
+      <div class="sfx-chain-editor-wrap" style="margin-bottom:1rem;">
+        <div class="sound-pattern-title" style="margin-bottom:6px;">SFX chain / Melody — chain slots to play a short tune</div>
+        <p style="margin:0 0 8px 0; color:#aaa; font-size:0.85rem;">Add steps: each step plays a sound slot after an optional delay (ms). Use in code: <code>k7.play_sfx_chain(0)</code> … <code>k7.play_sfx_chain(3)</code>.</p>
+        <div style="display:flex; flex-wrap:wrap; gap:1rem; align-items:flex-start;">
+          <div>
+            <label style="color:#8c8; font-size:0.9rem;">Chain </label>
+            <select id="sfx-chain-select" style="background:#2a2a3e; color:#eee; border:1px solid #444; border-radius:4px; padding:4px 8px; font-size:12px;">
+              <option value="0">0</option>
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+            </select>
+          </div>
+          <div id="sfx-chain-steps" style="display:flex; flex-direction:column; gap:4px; min-width:220px;"></div>
+          <div style="display:flex; flex-direction:column; gap:6px; flex-wrap:wrap;">
+            <button type="button" id="sfx-chain-add-step" class="btn">+ Add step</button>
+            <button type="button" id="sfx-chain-play" class="btn btn-primary">Play chain</button>
+            <button type="button" id="sfx-chain-stop" class="btn" title="Stop playback" style="display:none;">Stop</button>
+            <button type="button" id="sfx-chain-clear" class="btn" title="Clear all steps">Clear chain</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="panel-sprites" class="tab-panel">
+      <p>Sprite sheet: click or pick a sprite to select it; edit only in the zoom window below. Use in code: k7.spr(n, x, y, 1, 1, 0, 0), k7.sget(sx,sy), k7.sset(sx,sy,col).</p>
+      <div class="editor-toolbar">
+        <label>Color:</label>
+        <div id="sprite-palette" class="palette"></div>
+      </div>
+      <div class="sprite-picker-row">
+        <label>Select sprite:</label>
+        <button type="button" id="sprite-picker-prev" class="btn sprite-picker-nav" title="Previous row">◀</button>
+        <div id="sprite-picker-strip" class="sprite-picker-strip"></div>
+        <button type="button" id="sprite-picker-next" class="btn sprite-picker-nav" title="Next row">▶</button>
+        <span id="sprite-picker-range" class="sprite-picker-range">0–31</span>
+      </div>
+      <div class="sprite-editor-wrap">
+        <canvas id="sprite-sheet-canvas"></canvas>
+        <p id="sprite-hint" class="sprite-hint">Sprite 0 — click to select, edit in zoom below</p>
+      </div>
+      <div class="sprite-zoom-panel">
+        <p class="sprite-zoom-title">Edit sprite <input type="number" id="sprite-select-num" min="0" max="255" value="0" title="Sprite index" /> (select above or pick from strip)</p>
+        <div class="sprite-tools">
+          <button type="button" id="sprite-tool-pencil" class="sprite-tool-btn active" title="Draw with selected color">Pencil</button>
+          <button type="button" id="sprite-tool-eraser" class="sprite-tool-btn" title="Draw with transparent (0)">Eraser</button>
+          <button type="button" id="sprite-tool-fill" class="sprite-tool-btn" title="Fill 8×8 with selected color">Fill</button>
+        </div>
+        <div class="sprite-zoom-wrap">
+          <canvas id="sprite-zoom-canvas" width="128" height="128"></canvas>
+        </div>
+      </div>
+    </div>
+    <div id="panel-map" class="tab-panel">
+      <p>Map: 256×32 cells (sprite index 0–255). Tile flags: k7.mget_flags(cx,cy), k7.mset_flags(cx,cy,f) — bits 1=flip_x, 2=flip_y, 4=rotate. k7.map_draw(cx,cy, sx,sy, w,h).</p>
+      <div class="editor-toolbar">
+        <label>Paint sprite index:</label>
+        <input type="number" id="map-sprite-id" min="0" max="255" value="0" style="width:4em;" />
+      </div>
+      <div class="map-editor-wrap">
+        <canvas id="map-canvas"></canvas>
+      </div>
+      <p id="map-hint" class="map-hint">Cell (0,0) — 256×32 cells, each 8×8 in game</p>
+    </div>
+  </div>
+    </aside>
+    <div class="output-side" id="output-side">
+      <div id="wrap" tabindex="0" style="outline: none; position: relative;">
+        <canvas id="k7canvas" width="256" height="256"></canvas>
+        <div id="profiler-overlay" style="display:none;">FPS: — | — ms</div>
+      </div>
+      <p id="status">Loading Pyodide and K7…</p>
+      <div id="llm-chat-bar" class="llm-chat-bar" style="margin-top: 8px; width: 100%; max-width: 524px; gap: 6px; align-items: center;">
+        <input type="text" id="llm-chat-input" placeholder="Chat with LLM (type here, press Enter or Send)" style="flex: 1; padding: 6px 10px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 0.9rem;" />
+        <button type="button" id="llm-chat-send" class="btn">Send</button>
+      </div>
+      <p class="input-hint" id="input-hint">Click canvas or game area to focus for keyboard input (arrows, Z/X/C/V).</p>
+    </div>
+    </div>
+  </div>
+  <div id="cheat-sheet-modal" style="display:none;">
+    <div>
+      <div class="modal-header">
+        <h2>K7 Cheat Sheet</h2>
+        <button type="button" id="cheat-sheet-close" class="btn">Close</button>
+      </div>
+      <div id="cheat-sheet-content">
+        <section>
+          <h3>GFX (256×256)</h3>
+          <pre>k7.cls(col)                    # clear, col 0–15
+k7.pset(x, y, col)
+k7.rect(x0, y0, x1, y1, col)
+k7.rectfill(x0, y0, x1, y1, col)
+k7.circ(x, y, r, col)  k7.circfill(x, y, r, col)
+k7.line(x0, y0, x1, y1, col)
+k7.print(text, x, y, col)
+k7.color(col)                   # set draw color (for col=-1)
+k7.camera(x, y)
+k7.draw_to_canvas("k7canvas")   # flush to canvas
+k7.switch_palette("pico8")      # pico8, gameboy, cga, commodore64, atari2600</pre>
+        </section>
+        <section>
+          <h3>Input</h3>
+          <pre>k7.btn(i)   k7.btnp(i)   # i: 0=left 1=right 2=up 3=down 4=Z 5=X 6=C 7=V
+k7.mouse_x()  k7.mouse_y()  # 0–255 (canvas coords)
+k7.mouse_btn(i)  k7.mouse_btnp(i)  # 0=left 1=right
+
+# Keyboard capture (for chat, text input): captures chars, Enter, Backspace
+k7.text_input_mode(True)     # enable (False = game keys only)
+for c in k7.take_key_queue(): # returns list of "\n", "\b", or 1-char strings
+  ...</pre>
+        </section>
+        <section>
+          <h3>Sound</h3>
+          <pre>k7.set_sound(id, "c4 e4 g4")   # 16 slots
+k7.sfx(id)
+k7.play_sfx_chain(id)         # play chain 0–3 (built in Sounds → SFX chain)
+k7.set_music_track(id, "c4 e4 g4 c5")
+k7.play_music(channel, track_id)
+k7.stop_music(channel)
+k7.master_volume(0.5)   # 0–1
+k7.mute_sfx(1)   k7.mute_music(1)   # 0=on 1=mute</pre>
+        </section>
+        <section>
+          <h3>Sprites & Map</h3>
+          <pre>k7.spr(n, x, y, w, h, flip_x, flip_y, scale?)
+# scale: 1=8px/tile, 2=16px (optional, default 1)
+k7.sget(sx, sy)   k7.sset(sx, sy, col)
+k7.mget(cx, cy)   k7.mset(cx, cy, v)
+k7.mget_flags(cx, cy)   k7.mset_flags(cx, cy, f)  # f: 1=flip_x 2=flip_y 4=rotate
+k7.map_draw(cx, cy, sx, sy, w, h)</pre>
+        </section>
+        <section>
+          <h3>Fonts & 32-bit RGBA</h3>
+          <pre>k7.set_font("pico8"|"bbc"|"appleii"|"cbmii"|"trollmini")
+k7.print_rgba(text, x, y, r, g, b, a)  # 0–255, alpha for transparency
+k7.pset_rgba(x, y, r, g, b, a)</pre>
+        </section>
+        <section>
+          <h3>Palette & Flash</h3>
+          <pre>k7.palette_swap(a, b)   # swap colors 0–15
+k7.flash(color, frames)  # full-screen flash (color 0–15)</pre>
+        </section>
+        <section>
+          <h3>WebSocket (multiplayer)</h3>
+          <pre>k7.ws_connect(url)
+k7.ws_send(msg)
+k7.ws_take_messages()   # returns array of strings
+k7.ws_connected()</pre>
+        </section>
+        <section>
+          <h3>LLM (via WebSocket server)</h3>
+          <pre>k7.ws_connect("ws://127.0.0.1:8081")   # connect first (same server as multiplayer)
+k7.llm_configure(endpoint?, api_key?, model?)   # model optional, default gpt-4o-mini
+k7.llm_send(prompt, system_prompt?)
+k7.llm_pending()        # True if request in flight
+k7.llm_take_response()  # Returns text or None
+k7.llm_take_error()     # Returns error message or None</pre>
+          <p>Server proxies LLM to <code>http://127.0.0.1:1234</code>. Run <code>cargo run -p k7-multiplayer-server</code>, then <code>ws_connect</code> and <code>llm_send</code>. Poll <code>llm_take_response()</code> each frame.</p>
+        </section>
+        <section>
+          <h3>Shortcuts</h3>
+          <p>Run = click Run. <strong>P = pause/resume</strong> game. <strong>Share game</strong> = encode full game (code, sounds, map, sprites) into the URL and copy link. Code tab: Space = play sound (when Sounds panel active). Hot reload = re-run on code change. Profiler = show FPS/frame time overlay.</p>
+          <p>In code: <code>k7.paused()</code> returns 1 if paused, 0 otherwise; <code>k7.toggle_pause()</code> toggles pause. <code>k7.frame()</code> returns the current frame number (incremented each game loop tick) for timing or “once per frame” logic.</p>
+        </section>
+      </div>
+    </div>
+  </div>
+  <script type="module">
+    import init, { K7Web } from './pkg/k7_web.js';
+
+    const status = (msg) => { document.getElementById('status').textContent = msg; };
+
+    const defaultGame = `# K7 Python game: drawing, sound (sfx), and input (btn, btnp).
+# Click canvas to focus. Arrows or WASD = move, Z = jump / action, X = shoot.
+
+import js
+k7 = js.k7
+CANVAS_ID = "k7canvas"
+frame = 0
+px, py = 128, 180
+
+def init():
+    global frame, px, py
+    frame = 0
+    px, py = 128, 180
+    k7.set_sound(0, "c4 e4 g4 c5")
+    k7.set_sound(1, "a3 e4")
+
+def update():
+    global frame, px, py
+    frame += 1
+    if k7.btn(0): px = max(8, px - 2)
+    if k7.btn(1): px = min(248, px + 2)
+    if k7.btn(2): py = max(8, py - 2)
+    if k7.btn(3): py = min(248, py + 2)
+    if k7.btnp(4):
+        k7.sfx(0)
+    if k7.btnp(5):
+        k7.sfx(1)
+
+def draw():
+    k7.cls(0)
+    t = frame * 0.02
+    import math
+    cx = 128 + int(60 * math.sin(t * 0.5))
+    cy = 128 + int(40 * math.cos(t * 0.3))
+    k7.rect(8, 8, 247, 247, 7)
+    k7.circfill(128, 128, 40, 8)
+    k7.circfill(cx, cy, 12, 11)
+    k7.circfill(px, py, 8, 11)
+    k7.line(128, 128, cx, cy, 6)
+    k7.print("K7 + Python", 70, 218, 7)
+    k7.print("arrows/WASD move  Z/X sfx", 40, 230, 6)
+    k7.draw_to_canvas(CANVAS_ID)
+
+def game_loop():
+    update()
+    draw()
+    k7.draw_to_canvas(CANVAS_ID)
+
+init()
+js.game_loop_js = game_loop
+`;
+
+    const EXAMPLE_PATHS = {
+      default: 'editor-examples/default.py',
+      showcase: 'editor-examples/showcase.py',
+      mouse: 'editor-examples/mouse.py',
+      multiplayer: 'editor-examples/multiplayer.py',
+      shared_drawing: 'editor-examples/shared_drawing.py',
+      plasma: 'editor-examples/plasma.py',
+      fonts: 'editor-examples/fonts.py',
+      rgba: 'editor-examples/rgba.py',
+      ski: 'editor-examples/ski.py',
+      flappy: 'editor-examples/flappy.py',
+      fireworks: 'editor-examples/fireworks.py',
+      flock: 'editor-examples/flock.py',
+      ghostmark: 'editor-examples/ghostmark.py',
+      snake: 'editor-examples/snake.py',
+      sprites: 'editor-examples/sprites.py',
+      mapscroll: 'editor-examples/mapscroll.py',
+      tilemap_demo: 'editor-examples/tilemap_demo.py',
+      palettes_demo: 'editor-examples/palettes_demo.py',
+      pong: 'editor-examples/pong.py',
+      breakout: 'editor-examples/breakout.py',
+      platformer: 'editor-examples/platformer.py',
+      ravetunnel: 'editor-examples/ravetunnel.py',
+      kaleidoscope: 'editor-examples/kaleidoscope.py',
+      hypnospiral: 'editor-examples/hypnospiral.py',
+      rasterbars: 'editor-examples/rasterbars.py',
+      scroller: 'editor-examples/scroller.py',
+      phrack_demo: 'editor-examples/phrack_demo.py',
+      fire: 'editor-examples/fire.py',
+      audiotest: 'editor-examples/audiotest.py',
+      llm_demo: 'editor-examples/llm_demo.py',
+      sequencer: 'editor-examples/sequencer.py',
+      sable: 'editor-examples/sable.py',
+    };
+
+    async function loadExample(key) {
+      const path = EXAMPLE_PATHS[key];
+      if (!path) return;
+      status('Loading example…');
+      try {
+        const url = path + '?t=' + Date.now();
+        const res = await fetch(url, { cache: 'no-store' });
+        if (!res.ok) throw new Error(res.status);
+        const code = await res.text();
+        if (codeEditor && codeEditor.setValue) codeEditor.setValue(code, -1);
+        else {
+          const fb = document.getElementById('code-fallback');
+          if (fb) fb.value = code;
+        }
+        status('');
+      } catch (e) {
+        status('Failed to load example. Serve editor from a server (e.g. cargo run -p k7-web).');
+        console.warn('loadExample', key, e);
+      }
+    }
+
+    const defaultSounds = `# Sound definitions (reference in your Python code)
+# Format: note names (c4, e4, g4) or note:waveform|effect
+
+c4 e4 g4 c5
+c4:sine|reverb:small
+d4:square e4:square g4:square
+`;
+
+    // PICO-8–style 16-color palette (RGBA)
+    const PALETTE = [
+      [0, 0, 0, 255], [29, 43, 83, 255], [126, 37, 83, 255], [0, 135, 81, 255],
+      [171, 82, 54, 255], [95, 87, 79, 255], [194, 195, 199, 255], [255, 241, 232, 255],
+      [255, 0, 77, 255], [255, 163, 0, 255], [255, 236, 39, 255], [0, 228, 54, 255],
+      [41, 173, 255, 255], [131, 118, 156, 255], [255, 119, 168, 255], [255, 204, 170, 255]
+    ];
+
+    let rafId = null;
+    let codeEditor = null;
+    let gamePaused = false;
+    const profilerFrameTimes = [];
+    const PROFILER_HISTORY = 60;
+    let runCodeInProgress = false;
+    let hotReloadDebounceId = null;
+    const HOT_RELOAD_MS = 700;
+
+    // PICO-8 style input: btn(i) = held, btnp(i) = just pressed this frame
+    const BTN_LEFT = 0, BTN_RIGHT = 1, BTN_UP = 2, BTN_DOWN = 3, BTN_O = 4, BTN_X = 5, BTN_C = 6, BTN_V = 7;
+    const KEY_MAP = {
+      ArrowLeft: BTN_LEFT, ArrowRight: BTN_RIGHT, ArrowUp: BTN_UP, ArrowDown: BTN_DOWN,
+      KeyZ: BTN_O, KeyX: BTN_X, KeyC: BTN_C, KeyV: BTN_V,
+      KeyA: BTN_LEFT, KeyD: BTN_RIGHT, KeyW: BTN_UP, KeyS: BTN_DOWN,
+    };
+    const btnState = new Set();
+    const btnpState = new Set();
+    let mouseX = 0, mouseY = 0;
+    const mouseBtnState = new Set();
+    const mouseBtnpState = new Set();
+
+    // Replay: record input each frame; playback overrides input from replayData.
+    let replayRecording = false;
+    let replayData = [];
+    let replayPlaying = false;
+    let replayFrameIndex = 0;
+    window._replayInput = null;
+    window._replayPrevInput = null;
+    // Video capture for GIF export: one frame per rAF when recording, max 400 frames (~6.5 s at 60fps).
+    let replayFrames = [];
+    const REPLAY_FRAMES_MAX = 400;
+
+    function replaySnapshot() {
+      let keys = 0;
+      for (let i = 0; i <= 7; i++) if (btnState.has(i)) keys |= 1 << i;
+      let mbtn = 0;
+      if (mouseBtnState.has(0)) mbtn |= 1;
+      if (mouseBtnState.has(1)) mbtn |= 2;
+      return { keys, mx: mouseX, my: mouseY, mbtn };
+    }
+
+    function clearBtnp() {
+      btnpState.clear();
+      mouseBtnpState.clear();
+    }
+
+    function setupInput(k7) {
+      const wrap = document.getElementById('wrap');
+      const canvas = document.getElementById('k7canvas');
+      if (!wrap) return;
+      wrap.tabIndex = 0;
+      wrap.addEventListener('click', () => wrap.focus());
+      function resumeAudioOnce() {
+        wrap.removeEventListener('keydown', resumeAudioOnce);
+        wrap.removeEventListener('click', resumeAudioOnce);
+        if (canvas) canvas.removeEventListener('click', resumeAudioOnce);
+        if (!window.AudioContext && !window.webkitAudioContext) return;
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'closed') return;
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume().then(() => {
+            if (typeof ensureAudioGains === 'function') ensureAudioGains();
+          }).catch(() => {});
+        } else {
+          if (typeof ensureAudioGains === 'function') ensureAudioGains();
+        }
+      }
+      wrap.addEventListener('keydown', resumeAudioOnce);
+      wrap.addEventListener('click', resumeAudioOnce);
+      if (canvas) canvas.addEventListener('click', resumeAudioOnce);
+      window._k7KeyQueue = window._k7KeyQueue || [];
+      window._k7TextInputMode = false;
+      wrap.addEventListener('keydown', (e) => {
+        if (window._k7TextInputMode && (e.key === 'Backspace' || e.key === 'Enter' || (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey))) {
+          window._k7KeyQueue.push(e.key === 'Backspace' ? '\b' : e.key === 'Enter' ? '\n' : e.key);
+          e.preventDefault();
+          return;
+        }
+        const i = KEY_MAP[e.code];
+        if (i !== undefined) {
+          e.preventDefault();
+          if (!btnState.has(i)) btnpState.add(i);
+          btnState.add(i);
+        }
+      });
+      wrap.addEventListener('keyup', (e) => {
+        const i = KEY_MAP[e.code];
+        if (i !== undefined) {
+          e.preventDefault();
+          btnState.delete(i);
+        }
+      });
+      k7.btn = (i) => {
+        if (window._replayInput) return (window._replayInput.keys & (1 << (Number(i) & 7))) ? 1 : 0;
+        return btnState.has(Number(i)) ? 1 : 0;
+      };
+      k7.btnp = (i) => {
+        if (window._replayInput && window._replayPrevInput) {
+          const now = (window._replayInput.keys & (1 << (Number(i) & 7))) ? 1 : 0;
+          const prev = (window._replayPrevInput.keys & (1 << (Number(i) & 7))) ? 1 : 0;
+          return now && !prev ? 1 : 0;
+        }
+        return btnpState.has(Number(i)) ? 1 : 0;
+      };
+      k7.mouse_x = () => window._replayInput ? window._replayInput.mx : mouseX;
+      k7.mouse_y = () => window._replayInput ? window._replayInput.my : mouseY;
+      k7.mouse_btn = (i) => {
+        if (window._replayInput) return (window._replayInput.mbtn & (1 << (Number(i) & 1))) ? 1 : 0;
+        return mouseBtnState.has(Number(i)) ? 1 : 0;
+      };
+      k7.mouse_btnp = (i) => {
+        if (window._replayInput && window._replayPrevInput) {
+          const now = (window._replayInput.mbtn & (1 << (Number(i) & 1))) ? 1 : 0;
+          const prev = (window._replayPrevInput.mbtn & (1 << (Number(i) & 1))) ? 1 : 0;
+          return now && !prev ? 1 : 0;
+        }
+        return mouseBtnpState.has(Number(i)) ? 1 : 0;
+      };
+      window._flashFrames = window._flashFrames || 0;
+      window._flashColor = window._flashColor || 0;
+      k7.flash = (color, frames) => {
+        window._flashFrames = Math.max(0, Number(frames)|0);
+        window._flashColor = Math.max(0, Math.min(15, Number(color)|0));
+      };
+      k7.paused = () => gamePaused ? 1 : 0;
+      k7.toggle_pause = () => { if (typeof togglePause === 'function') togglePause(); };
+      k7.text_input_mode = (on) => { window._k7TextInputMode = !!(on === 1 || on === true); };
+      k7.take_key_queue = () => {
+        const q = window._k7KeyQueue || [];
+        window._k7KeyQueue = [];
+        return q;
+      };
+      if (canvas) {
+        function setMouseFromEvent(e) {
+          const r = canvas.getBoundingClientRect();
+          const scaleX = 256 / r.width;
+          const scaleY = 256 / r.height;
+          const clientX = 'clientX' in e ? e.clientX : (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+          const clientY = 'clientY' in e ? e.clientY : (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
+          mouseX = Math.floor((clientX - r.left) * scaleX);
+          mouseY = Math.floor((clientY - r.top) * scaleY);
+          mouseX = Math.max(0, Math.min(255, mouseX));
+          mouseY = Math.max(0, Math.min(255, mouseY));
+        }
+        function setButton(touchOrMouse, down) {
+          const i = (touchOrMouse === 0 || touchOrMouse === 'left') ? 0 : 1;
+          if (down) {
+            if (!mouseBtnState.has(i)) mouseBtnpState.add(i);
+            mouseBtnState.add(i);
+          } else mouseBtnState.delete(i);
+        }
+        canvas.addEventListener('mousemove', (e) => { setMouseFromEvent(e); });
+        canvas.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          setMouseFromEvent(e);
+          const i = (e.button === 0) ? 0 : (e.button === 2) ? 1 : -1;
+          if (i >= 0) setButton(i, true);
+        });
+        canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+        window.addEventListener('mouseup', (e) => {
+          const i = (e.button === 0) ? 0 : (e.button === 2) ? 1 : -1;
+          if (i >= 0) setButton(i, false);
+        });
+        canvas.addEventListener('touchstart', (e) => {
+          if (e.cancelable) e.preventDefault();
+          if (e.touches.length > 0) {
+            setMouseFromEvent(e.touches[0]);
+            setButton(0, true);
+          }
+        }, { passive: false });
+        canvas.addEventListener('touchmove', (e) => {
+          if (e.touches.length > 0) setMouseFromEvent(e.touches[0]);
+        }, { passive: true });
+        canvas.addEventListener('touchend', (e) => {
+          if (e.touches.length === 0) setButton(0, false);
+        });
+        canvas.addEventListener('touchcancel', (e) => {
+          if (e.touches.length === 0) setButton(0, false);
+        });
+      }
+    }
+
+    // Sound bank: 16 slots, note strings. Playback uses Rust parser/synth (k7.render_sound) when available; else JS fallback.
+    const SOUND_SLOTS = 16;
+    const soundBank = new Array(SOUND_SLOTS).fill('');
+    const SFX_CHAIN_COUNT = 4;
+    const sfxChains = Array.from({ length: SFX_CHAIN_COUNT }, () => [{ slot: 0, delay: 0 }]);
+    const MUSIC_TRACKS = 8;
+    const musicTracks = new Array(MUSIC_TRACKS).fill('');
+    let musicIntervalId = null;
+    let musicGainWhenPaused = 1;
+    let audioCtx = null;
+    let masterGain = null;
+    let sfxGain = null;
+    let musicGain = null;
+    let soundTokenExpander = (t) => t;
+    // Instrument list for editor (expansion is in Rust). id = category:preset.
+    const INSTRUMENT_OPTIONS = [
+      { id: 'piano:bright', label: 'Piano / Bright' }, { id: 'piano:dark', label: 'Piano / Dark' },
+      { id: 'lead:pulse', label: 'Lead / Pulse' }, { id: 'lead:saw', label: 'Lead / Saw' }, { id: 'lead:sine', label: 'Lead / Sine' },
+      { id: 'bass:soft', label: 'Bass / Soft' }, { id: 'bass:punch', label: 'Bass / Punch' },
+      { id: 'chip:pulse', label: 'Chip / Pulse' }, { id: 'chip:tri', label: 'Chip / Tri' }, { id: 'chip:noise', label: 'Chip / Noise' },
+      { id: 'pluck:soft', label: 'Pluck / Soft' }, { id: 'pluck:bright', label: 'Pluck / Bright' },
+      { id: 'pad:strings', label: 'Pad / Strings' }, { id: 'pad:organ', label: 'Pad / Organ' },
+      { id: 'drums:kick', label: 'Drums / Kick' }, { id: 'drums:snare', label: 'Drums / Snare' }, { id: 'drums:hat', label: 'Drums / Hat' },
+    ];
+
+    function noteToFreq(name) {
+      const m = String(name).trim().toLowerCase().match(/^([a-g])([#bs]?)(\d*)$/);
+      if (!m) return 440;
+      const map = { c: 0, d: 2, e: 4, f: 5, g: 7, a: 9, b: 11 };
+      const oct = m[3] ? parseInt(m[3], 10) : 4;
+      const semitone = (map[m[1]] || 0) + (m[2] === '#' || m[2] === 's' ? 1 : m[2] === 'b' ? -1 : 0) + (oct - 4) * 12;
+      return 440 * Math.pow(2, (semitone - 9) / 12);
+    }
+
+    function parseSoundToken(token) {
+      token = soundTokenExpander(token.trim());
+      if (!token || token === '-' || token.toLowerCase() === 'r') return { freq: 0, waveform: 'triangle', effects: [], volume: 1 };
+      let volume = 1;
+      let notePart = token.split('|')[0];
+      const atMatch = notePart.match(/^(.+?)@(\d+)$/);
+      if (atMatch) {
+        notePart = atMatch[1].trim();
+        volume = Math.max(0, Math.min(100, parseInt(atMatch[2], 10))) / 100;
+      }
+      const parts = token.split('|');
+      parts[0] = notePart;
+      const noteColon = notePart.split(':');
+      let noteStr = noteColon[0];
+      let waveform = 'triangle';
+      for (let i = 1; i < noteColon.length; i++) {
+        const w = noteColon[i].toLowerCase();
+        if (w === 'layer' && noteColon.length > 2) {
+          waveform = 'layer:' + noteColon.slice(2).join(':');
+          break;
+        }
+        if (w.startsWith('layer:')) { waveform = w; break; }
+        if (['sine','sin','square','sq','triangle','tri','sawtooth','saw','noise','pink'].includes(w) || w.startsWith('pwm')) { waveform = w.startsWith('pwm') ? 'pwm' : w; break; }
+      }
+      const effects = [];
+      for (let j = 1; j < parts.length; j++) {
+        const e = parts[j].trim();
+        if (e) effects.push(e);
+      }
+      return { freq: noteToFreq(noteStr), waveform, effects, volume };
+    }
+
+    function tokenToStep(token) {
+      token = String(token).trim();
+      if (!token || token === '-' || token.toLowerCase() === 'r') return { noteStr: '-', volume: 100, waveform: 'triangle', effects: [], instrument: null };
+      let notePart = token.split('|')[0].trim();
+      const effects = token.split('|').slice(1).map(p => p.trim()).filter(Boolean);
+      let noteStr = '', vol = 100, waveform = 'triangle', instrument = null;
+      const noteColon = notePart.split(':');
+      if (noteColon.length >= 3) {
+        const instId = (noteColon[1] + ':' + noteColon[2]).toLowerCase();
+        if (INSTRUMENT_OPTIONS.some(o => o.id === instId)) {
+          const first = noteColon[0].trim();
+          const atMatch = first.match(/^(.+?)@(\d+)$/);
+          noteStr = atMatch ? atMatch[1].trim() : first;
+          vol = atMatch ? Math.max(0, Math.min(100, parseInt(atMatch[2], 10))) : 100;
+          instrument = instId;
+          if (!noteStr || noteStr === '-' || noteStr === 'r') return { noteStr: '-', volume: vol, waveform: 'triangle', effects, instrument: null };
+          return { noteStr, volume: vol, waveform: 'triangle', effects, instrument };
+        }
+      }
+      const atMatch = notePart.match(/^(.+?)@(\d+)$/);
+      if (atMatch) { notePart = atMatch[1].trim(); vol = Math.max(0, Math.min(100, parseInt(atMatch[2], 10))); }
+      const colonIdx = notePart.indexOf(':');
+      if (colonIdx >= 0) {
+        noteStr = notePart.slice(0, colonIdx).trim();
+        const w = notePart.slice(colonIdx + 1).toLowerCase().split('|')[0].trim();
+        if (w === 'layer' || w.startsWith('layer:')) waveform = notePart.slice(colonIdx + 1).split('|')[0].trim();
+        else if (['sine','sin','square','sq','triangle','tri','sawtooth','saw','noise'].includes(w)) waveform = w.startsWith('saw') ? 'sawtooth' : w === 'sin' ? 'sine' : w === 'sq' ? 'square' : w === 'tri' ? 'triangle' : w;
+      } else {
+        noteStr = notePart;
+      }
+      if (!noteStr || noteStr === '-' || noteStr === 'r') return { noteStr: '-', volume: vol, waveform, effects, instrument: null };
+      return { noteStr, volume: vol, waveform, effects, instrument: null };
+    }
+
+    function stepToToken(step) {
+      if (step.noteStr === '-' || !step.noteStr) return step.effects && step.effects.length ? '-|' + step.effects.join('|') : '-';
+      let s = step.noteStr;
+      if (step.volume !== 100) s += '@' + step.volume;
+      if (step.instrument) s += ':' + step.instrument;
+      else if (step.waveform && step.waveform !== 'triangle') s += ':' + step.waveform;
+      if (step.effects && step.effects.length) s += '|' + step.effects.join('|');
+      return s;
+    }
+
+    function tokenizeSoundString(str) {
+      if (!str || !str.trim()) return [];
+      return str.trim().split(/\s+/).map(tokenToStep);
+    }
+
+    function buildSoundString(steps) {
+      const tokens = steps.map(stepToToken);
+      let last = tokens.length - 1;
+      while (last >= 0 && (tokens[last] === '-' || !tokens[last].trim())) last--;
+      return tokens.slice(0, last + 1).join(' ');
+    }
+
+    function drawWaveformPreview(canvas, waveform) {
+      if (!canvas || !canvas.getContext) return;
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width;
+      const h = canvas.height;
+      ctx.fillStyle = '#1a1a2e';
+      ctx.fillRect(0, 0, w, h);
+      ctx.strokeStyle = '#6c8';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      const wave = (waveform || 'triangle').toLowerCase();
+      const midY = h / 2;
+      for (let x = 0; x <= w; x++) {
+        const t = (x / w) * 2 * Math.PI;
+        let y = midY;
+        if (wave === 'sine' || wave === 'sin') y = midY - (h * 0.4) * Math.sin(t);
+        else if (wave === 'square' || wave === 'sq') y = midY - (h * 0.4) * (Math.sin(t) >= 0 ? 1 : -1);
+        else if (wave === 'sawtooth' || wave === 'saw') y = midY - (h * 0.4) * (2 * (t / (2 * Math.PI)) - 1);
+        else if (wave === 'triangle' || wave === 'tri') {
+          const s = (t / (2 * Math.PI) * 4) % 4;
+          y = midY - (h * 0.4) * (s <= 1 ? s * 2 : s <= 2 ? 2 - (s - 1) * 2 : s <= 3 ? -(s - 2) * 2 : -2 + (s - 3) * 2);
+        } else y = midY;
+        if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+
+    function parseLayerSpec(spec) {
+      const layers = [];
+      const rest = spec.replace(/^layer:/i, '').split(',');
+      for (const part of rest) {
+        const [w, g] = part.split(':').map(s => s.trim());
+        const gain = g != null && !isNaN(parseFloat(g)) ? parseFloat(g) : 0.33;
+        let wave = (w || 'tri').toLowerCase();
+        if (wave === 'sq') wave = 'square'; else if (wave === 'tri') wave = 'triangle'; else if (wave === 'saw') wave = 'sawtooth'; else if (wave === 'sin') wave = 'sine';
+        layers.push({ waveform: wave, gain });
+      }
+      return layers.length ? layers : [{ waveform: 'triangle', gain: 1 }];
+    }
+
+    function applyEffect(ctx, name, params, nextNode) {
+      const p = (i, def) => (i < params.length && !isNaN(parseFloat(params[i]))) ? parseFloat(params[i]) : def;
+      const n = name.toLowerCase();
+      if (n === 'lowpass' || n === 'lp' || n === 'lpf') {
+        const preset = (params[0] || '').toLowerCase();
+        let cutoff = 1000, res = 0.3;
+        if (preset === 'dark') { cutoff = 300; res = 0.4; } else if (preset === 'warm') { cutoff = 800; res = 0.3; } else { cutoff = p(0, 1000); res = p(1, 0.3); }
+        const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = cutoff; f.Q.value = res; nextNode.connect(f); return f;
+      }
+      if (n === 'highpass' || n === 'hp' || n === 'hpf') {
+        const preset = (params[0] || '').toLowerCase();
+        let cutoff = 200, res = 0.3;
+        if (preset === 'thin') { cutoff = 800; } else if (preset === 'bright') { cutoff = 300; } else { cutoff = p(0, 200); res = p(1, 0.3); }
+        const f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = cutoff; f.Q.value = res; nextNode.connect(f); return f;
+      }
+      if (n === 'echo' || n === 'delay' || n === 'dly') {
+        const preset = (params[0] || '').toLowerCase();
+        let delayMs = 300, feedback = 0.4, mix = 0.5;
+        if (preset === 'short' || preset === 'small') { delayMs = 150; feedback = 0.3; mix = 0.4; } else if (preset === 'medium' || preset === 'med') { delayMs = 300; feedback = 0.4; mix = 0.5; } else if (preset === 'long') { delayMs = 500; feedback = 0.5; mix = 0.6; } else { delayMs = p(0, 300); feedback = p(1, 0.4); mix = p(2, 0.5); }
+        const delay = ctx.createDelay(2); delay.delayTime.value = delayMs / 1000;
+        const fb = ctx.createGain(); fb.gain.value = feedback;
+        const mixGain = ctx.createGain(); mixGain.gain.value = mix;
+        nextNode.connect(delay); delay.connect(fb); fb.connect(delay); delay.connect(mixGain); nextNode.connect(mixGain); return mixGain;
+      }
+      if (n === 'reverb' || n === 'rev' || n === 'room') {
+        const preset = (params[0] || '').toLowerCase();
+        let room = 0.5, mix = 0.4;
+        if (preset === 'small') { room = 0.3; mix = 0.3; } else if (preset === 'medium' || preset === 'med') { room = 0.5; mix = 0.4; } else if (preset === 'large' || preset === 'hall') { room = 0.8; mix = 0.5; } else { room = p(0, 0.5); mix = p(2, 0.4); }
+        const d1 = ctx.createDelay(2); d1.delayTime.value = 0.03; const d2 = ctx.createDelay(2); d2.delayTime.value = 0.07;
+        const g1 = ctx.createGain(); g1.gain.value = room * 0.5; const g2 = ctx.createGain(); g2.gain.value = room * 0.3;
+        const dry = ctx.createGain(); dry.gain.value = 1 - mix; const wet = ctx.createGain(); wet.gain.value = mix;
+        nextNode.connect(dry); nextNode.connect(d1); d1.connect(g1); g1.connect(d2); d2.connect(g2); g2.connect(wet); dry.connect(wet); return wet;
+      }
+      if (n === 'envelope' || n === 'env' || n === 'adsr') {
+        const preset = (params[0] || '').toLowerCase();
+        let a = 0.01, d = 0.1, s = 0.7, r = 0.2;
+        if (preset === 'pluck') { a = 0.001; d = 0.05; s = 0; r = 0.1; } else if (preset === 'pad') { a = 0.5; d = 0.2; s = 0.8; r = 1; } else if (preset === 'organ') { a = 0.001; d = 0; s = 1; r = 0.05; } else { a = p(1, 0.01); d = p(2, 0.1); s = p(3, 0.7); r = p(4, 0.2); }
+        window._lastEnvParams = { a, d, s, r }; return nextNode;
+      }
+      if (n === 'tremolo' || n === 'trem') {
+        const rate = p(1, 5), depth = Math.min(0.99, p(2, 0.5));
+        const lfo = ctx.createOscillator(); lfo.frequency.value = rate; lfo.type = 'sine';
+        const depthGain = ctx.createGain(); depthGain.gain.value = depth * 0.5;
+        const outGain = ctx.createGain(); outGain.gain.value = 1;
+        nextNode.connect(outGain); lfo.connect(depthGain); depthGain.connect(outGain.gain); lfo.start(0); return outGain;
+      }
+      if (n === 'distortion' || n === 'dist') {
+        const preset = (params[0] || '').toLowerCase();
+        let amount = 0.5;
+        if (preset === 'soft') amount = 0.3; else if (preset === 'medium' || preset === 'med') amount = 0.5; else if (preset === 'hard') amount = 0.7; else amount = p(1, 0.5);
+        const shaper = ctx.createWaveShaper(); const curve = new Float32Array(256); for (let i = 0; i < 256; i++) { const x = (i / 128 - 1) * (1 + amount * 10); curve[i] = Math.tanh(x); } shaper.curve = curve; nextNode.connect(shaper); return shaper;
+      }
+      return nextNode;
+    }
+
+    function createOscNode(ctx, freq, waveform) {
+      const osc = ctx.createOscillator();
+      osc.frequency.value = freq;
+      const w = (waveform || 'triangle').toLowerCase();
+      if (w === 'sine' || w === 'sin') osc.type = 'sine';
+      else if (w === 'square' || w === 'sq') osc.type = 'square';
+      else if (w === 'triangle' || w === 'tri') osc.type = 'triangle';
+      else if (w === 'sawtooth' || w === 'saw') osc.type = 'sawtooth';
+      else osc.type = 'triangle';
+      return osc;
+    }
+
+    function ensureAudioGains() {
+      if (!audioCtx || audioCtx.state === 'closed') return;
+      if (masterGain) return;
+      masterGain = audioCtx.createGain();
+      masterGain.gain.value = 1;
+      masterGain.connect(audioCtx.destination);
+      sfxGain = audioCtx.createGain();
+      sfxGain.gain.value = 1;
+      sfxGain.connect(masterGain);
+      musicGain = audioCtx.createGain();
+      musicGain.gain.value = 1;
+      musicGain.connect(masterGain);
+    }
+
+    function playSoundString(str, outNode) {
+      if (!str || !str.trim()) return;
+      try {
+        if (!audioCtx || audioCtx.state === 'closed') {
+          audioCtx = null;
+          masterGain = null;
+          sfxGain = null;
+          musicGain = null;
+          if (window.AudioContext || window.webkitAudioContext) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          }
+        }
+        if (!audioCtx) return;
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        ensureAudioGains();
+        const dest = outNode != null ? outNode : sfxGain;
+        if (!dest) return;
+        const k7 = globalThis.k7 || window.k7;
+        if (k7 && typeof k7.render_sound === 'function' && typeof k7.get_audio_sample_rate === 'function') {
+          const samples = k7.render_sound(str);
+          const sr = k7.get_audio_sample_rate();
+          const len = samples.length;
+          if (len === 0) return;
+          const buf = audioCtx.createBuffer(1, len, sr);
+          buf.copyToChannel(samples, 0);
+          const src = audioCtx.createBufferSource();
+          src.buffer = buf;
+          src.connect(dest);
+          src.start(0);
+          return;
+        }
+        const tokens = str.trim().split(/\s+/);
+        const dur = 0.08;
+        const step = dur * 0.7;
+        const now = Math.max(0, audioCtx.currentTime);
+        tokens.forEach((token, i) => {
+          const parsed = parseSoundToken(token);
+          if (parsed.freq <= 0) return;
+          const vol = (parsed.volume != null ? parsed.volume : 1);
+          const t = Math.max(0, now + i * step);
+          let node;
+          const wave = parsed.waveform || 'triangle';
+          if (typeof wave === 'string' && wave.toLowerCase().startsWith('layer:')) {
+            const layers = parseLayerSpec(wave);
+            const sumGain = audioCtx.createGain();
+            sumGain.gain.value = 1;
+            for (const layer of layers) {
+              const osc = createOscNode(audioCtx, parsed.freq, layer.waveform);
+              const g = audioCtx.createGain();
+              g.gain.value = layer.gain;
+              osc.connect(g);
+              g.connect(sumGain);
+              osc.start(t);
+              osc.stop(t + dur + 0.1);
+            }
+            node = sumGain;
+          } else {
+            const osc = createOscNode(audioCtx, parsed.freq, wave);
+            node = osc;
+            osc.start(t);
+            osc.stop(t + dur + 0.1);
+          }
+          for (const eff of parsed.effects) {
+            const [name, ...params] = eff.split(':').map(s => s.trim());
+            node = applyEffect(audioCtx, name || '', params, node);
+          }
+          const gain = audioCtx.createGain();
+          gain.gain.setValueAtTime(0, t);
+          const baseAmp = 0.2 * vol;
+          const env = window._lastEnvParams;
+          if (env) {
+            const t1 = t + env.a;
+            const t2 = t + env.a + env.d;
+            const releaseStart = Math.max(t2, t + dur - Math.min(env.r, dur));
+            gain.gain.linearRampToValueAtTime(baseAmp, t1);
+            gain.gain.linearRampToValueAtTime(baseAmp * env.s, t2);
+            gain.gain.setValueAtTime(baseAmp * env.s, releaseStart);
+            gain.gain.linearRampToValueAtTime(0.001, t + dur);
+          } else {
+            gain.gain.linearRampToValueAtTime(baseAmp * 0.75, t + 0.005); gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+          }
+          node.connect(gain);
+          gain.connect(dest);
+        });
+      } catch (e) {
+        console.warn('Sound:', e);
+      }
+    }
+
+    function setupSound(k7) {
+      soundTokenExpander = (typeof k7.expand_sound_token === 'function')
+        ? (t) => k7.expand_sound_token(t)
+        : (t) => t;
+      k7.set_sound = (id, s) => {
+        const i = Math.max(0, Math.min(SOUND_SLOTS - 1, Number(id)|0));
+        soundBank[i] = (s != null && s !== undefined) ? String(s) : '';
+        const el = document.getElementById('sound-input-' + i);
+        if (el) el.value = soundBank[i];
+        if (typeof refreshPatternStrip === 'function') refreshPatternStrip();
+      };
+      k7.sfx = (id) => {
+        const i = Math.max(0, Math.min(SOUND_SLOTS - 1, Number(id)|0));
+        playSoundString(soundBank[i]);
+      };
+      k7.play_sfx_chain = (chainId) => {
+        const id = Math.max(0, Math.min(SFX_CHAIN_COUNT - 1, Number(chainId)|0));
+        const steps = sfxChains[id] || [];
+        if (steps.length === 0) return;
+        let t = 0;
+        for (const s of steps) {
+          const slot = Math.max(0, Math.min(SOUND_SLOTS - 1, Number(s.slot)|0));
+          const delay = Math.max(0, Number(s.delay)|0);
+          t += delay;
+          if (soundBank[slot]) setTimeout(() => playSoundString(soundBank[slot]), t);
+        }
+      };
+      k7.set_music_track = (id, notation) => {
+        const i = Math.max(0, Math.min(MUSIC_TRACKS - 1, Number(id)|0));
+        musicTracks[i] = (notation != null && notation !== undefined) ? String(notation) : '';
+      };
+      k7.play_music = (channel, track_id) => {
+        if (musicIntervalId) clearInterval(musicIntervalId);
+        musicIntervalId = null;
+        const tid = Math.max(0, Math.min(MUSIC_TRACKS - 1, Number(track_id)|0));
+        const notation = musicTracks[tid];
+        if (!notation || !notation.trim()) return;
+        const tokens = notation.trim().split(/\s+/);
+        if (tokens.length === 0) return;
+        let step = 0;
+        const stepMs = 200;
+        musicIntervalId = setInterval(() => {
+          if (gamePaused) return;
+          playSoundString(tokens[step % tokens.length], musicGain);
+          step++;
+        }, stepMs);
+      };
+      k7.stop_music = (channel) => {
+        if (musicIntervalId) clearInterval(musicIntervalId);
+        musicIntervalId = null;
+      };
+      k7.master_volume = (v) => {
+        if (masterGain == null) return;
+        const x = Math.max(0, Math.min(1, Number(v)));
+        masterGain.gain.value = x;
+      };
+      k7.mute_sfx = (m) => {
+        if (sfxGain == null) return;
+        sfxGain.gain.value = m ? 0 : 1;
+      };
+      k7.mute_music = (m) => {
+        if (musicGain == null) return;
+        musicGain.gain.value = m ? 0 : 1;
+      };
+    }
+
+    function setupLLM(k7) {
+      let llmResponse = null;
+      let llmError = null;
+      let llmPending = false;
+      let llmModel = 'gpt-4o-mini';
+
+      k7.llm_configure = (endpoint, api_key, model) => {
+        if (model != null && model !== undefined) llmModel = String(model).trim() || 'gpt-4o-mini';
+      };
+
+      k7.llm_send = (prompt, system_prompt) => {
+        if (!k7.ws_connected()) {
+          llmError = 'LLM over WebSocket: connect first with k7.ws_connect(url) (e.g. ws://127.0.0.1:8081)';
+          return;
+        }
+        llmPending = true;
+        llmResponse = null;
+        llmError = null;
+        const payload = JSON.stringify({
+          prompt: String(prompt != null ? prompt : '').trim() || 'Hi',
+          system_prompt: system_prompt != null && String(system_prompt).trim() ? String(system_prompt).trim() : '',
+          model: llmModel
+        });
+        k7.ws_send('LLM_REQ:' + payload);
+      };
+
+      k7.llm_pending = () => llmPending;
+
+      k7.llm_take_response = () => {
+        const r = llmResponse;
+        llmResponse = null;
+        return r != null ? r : null;
+      };
+
+      k7.llm_take_error = () => {
+        const e = llmError;
+        llmError = null;
+        return e != null ? e : null;
+      };
+
+      const origWsTakeMessages = k7.ws_take_messages.bind(k7);
+      k7.ws_take_messages = function() {
+        const arr = origWsTakeMessages();
+        const out = [];
+        for (let i = 0; i < arr.length; i++) {
+          const s = arr[i];
+          if (typeof s === 'string' && s.startsWith('LLM_RESP:')) {
+            llmResponse = s.slice(9);
+            llmPending = false;
+          } else if (typeof s === 'string' && s.startsWith('LLM_ERR:')) {
+            llmError = s.slice(8);
+            llmPending = false;
+          } else {
+            out.push(s);
+          }
+        }
+        return out;
+      };
+    }
+
+    let selectedSoundSlot = 0;
+    function initSoundEditor() {
+      const grid = document.getElementById('sound-editor-grid');
+      const hintEl = document.getElementById('sound-selected-hint');
+      if (!grid) return;
+      const defaults = ['c4 e4 g4 c5', 'c4:piano:bright', 'c4@100 e4@80 g4@60 c5@100', 'e4:chip:pulse|echo:short', '', '', '', '', '', '', '', '', '', '', ''];
+      for (let i = 0; i < SOUND_SLOTS; i++) {
+        if (soundBank[i] === '') soundBank[i] = defaults[i] || '';
+        const row = document.createElement('div');
+        row.className = 'sound-slot-row' + (i === 0 ? ' selected' : '');
+        row.dataset.slot = String(i);
+        const label = document.createElement('span');
+        label.className = 'slot-num';
+        label.textContent = i + '.';
+        const preview = document.createElement('span');
+        preview.className = 'sound-slot-preview';
+        preview.title = soundBank[i] || '—';
+        preview.textContent = (soundBank[i] || '—').slice(0, 24);
+        if (preview.textContent.length >= 24 && (soundBank[i] || '').length > 24) preview.textContent += '…';
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.id = 'sound-input-' + i;
+        input.value = soundBank[i];
+        input.placeholder = 'c4 e4 g4 or c4:sine|reverb:small';
+        input.addEventListener('input', () => {
+          soundBank[i] = input.value;
+          preview.textContent = (input.value || '—').slice(0, 24);
+          if (preview.textContent.length >= 24 && input.value.length > 24) preview.textContent += '…';
+          preview.title = input.value || '—';
+          if (i === selectedSoundSlot && typeof refreshPatternStrip === 'function') refreshPatternStrip();
+        });
+        input.addEventListener('click', (e) => e.stopPropagation());
+        const playBtn = document.createElement('button');
+        playBtn.type = 'button';
+        playBtn.className = 'btn play-btn';
+        playBtn.textContent = '▶';
+        playBtn.title = 'Play';
+        playBtn.addEventListener('click', (e) => { e.stopPropagation(); playSoundString(soundBank[i]); });
+        row.appendChild(label);
+        row.appendChild(preview);
+        row.appendChild(input);
+        row.appendChild(playBtn);
+        row.addEventListener('click', () => {
+          selectedSoundSlot = i;
+          grid.querySelectorAll('.sound-slot-row').forEach(r => r.classList.remove('selected'));
+          row.classList.add('selected');
+          if (hintEl) hintEl.textContent = 'Selected: ' + i + ' — k7.sfx(' + i + ') · Space to test';
+          const slotNumEl = document.getElementById('sound-pattern-slot-num');
+          if (slotNumEl) slotNumEl.textContent = String(i);
+          const dupTo = document.getElementById('sound-duplicate-to');
+          if (dupTo) {
+            dupTo.innerHTML = '';
+            const opt0 = document.createElement('option');
+            opt0.value = '';
+            opt0.textContent = '—';
+            dupTo.appendChild(opt0);
+            for (let j = 0; j < SOUND_SLOTS; j++) {
+              if (j === i) continue;
+              const opt = document.createElement('option');
+              opt.value = String(j);
+              opt.textContent = String(j);
+              dupTo.appendChild(opt);
+            }
+          }
+          if (typeof refreshPatternStrip === 'function') refreshPatternStrip();
+        });
+        grid.appendChild(row);
+      }
+      const dupToEl = document.getElementById('sound-duplicate-to');
+      if (dupToEl) {
+        for (let j = 0; j < SOUND_SLOTS; j++) {
+          if (j === 0) continue;
+          const opt = document.createElement('option');
+          opt.value = String(j);
+          opt.textContent = String(j);
+          dupToEl.appendChild(opt);
+        }
+        dupToEl.addEventListener('change', () => {
+          const to = parseInt(dupToEl.value, 10);
+          if (isNaN(to) || to < 0 || to >= SOUND_SLOTS) return;
+          soundBank[to] = soundBank[selectedSoundSlot] || '';
+          const toInput = document.getElementById('sound-input-' + to);
+          if (toInput) toInput.value = soundBank[to];
+          const toRow = grid.querySelector('.sound-slot-row[data-slot="' + to + '"]');
+          if (toRow) {
+            const p = toRow.querySelector('.sound-slot-preview');
+            if (p) { p.textContent = (soundBank[to] || '—').slice(0, 24); p.title = soundBank[to] || '—'; }
+          }
+          dupToEl.value = '';
+        });
+      }
+      const clearSlotBtn = document.getElementById('sound-clear-slot');
+      if (clearSlotBtn) clearSlotBtn.addEventListener('click', () => {
+        soundBank[selectedSoundSlot] = '';
+        const inputEl = document.getElementById('sound-input-' + selectedSoundSlot);
+        if (inputEl) inputEl.value = '';
+        const row = grid.querySelector('.sound-slot-row.selected');
+        if (row) {
+          const p = row.querySelector('.sound-slot-preview');
+          if (p) { p.textContent = '—'; p.title = '—'; }
+        }
+        if (typeof refreshPatternStrip === 'function') refreshPatternStrip();
+      });
+      const PATTERN_STEPS = 16;
+      const stripEl = document.getElementById('sound-pattern-strip');
+      const popoverEl = document.getElementById('sound-popover');
+      const popoverNoteKeys = document.getElementById('sound-popover-note-keys');
+      const popoverVol = document.getElementById('sound-popover-vol');
+      const popoverVolVal = document.getElementById('sound-popover-vol-val');
+      const popoverRestBtn = document.getElementById('sound-popover-rest');
+      let editingStepIndex = 0;
+      let patternPlayIntervalId = null;
+      let soundPlayheadIntervalId = null;
+      let soundPlayheadStep = -1;
+      function setSoundPlayhead(step) {
+        soundPlayheadStep = step;
+        if (typeof updatePlayheadVisual === 'function') updatePlayheadVisual();
+      }
+      function updatePlayheadVisual() {
+        const steps = tokenizeSoundString(soundBank[selectedSoundSlot] || '');
+        const stepHasNote = soundPlayheadStep >= 0 && soundPlayheadStep < steps.length && (steps[soundPlayheadStep]?.noteStr || '-') !== '-';
+        const strip = document.getElementById('sound-pattern-strip');
+        if (strip) strip.querySelectorAll('.sound-step-cell').forEach((c, i) => {
+          const playing = i === soundPlayheadStep;
+          c.classList.toggle('playing', playing);
+          c.classList.toggle('playing-note', playing && stepHasNote);
+        });
+        const roll = document.getElementById('sound-piano-roll');
+        if (roll) roll.querySelectorAll('.roll-cell').forEach(c => {
+          const col = parseInt(c.dataset.col, 10);
+          const playing = col === soundPlayheadStep;
+          c.classList.toggle('playing', playing);
+          c.classList.toggle('playing-note', playing && c.classList.contains('active'));
+        });
+      }
+      function closePopover() {
+        if (popoverEl) popoverEl.style.display = 'none';
+        if (stripEl) stripEl.querySelectorAll('.sound-step-cell').forEach(c => c.classList.remove('editing'));
+      }
+      const NOTE_LABELS = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+      const PIANO_ROLL_NOTE_ROWS = ['-', 'c5','b4','a#4','a4','g#4','g4','f#4','f4','e4','d#4','d4','c#4','c4','b3','a#3','a3','g#3','g3','f#3','f3','e3','d#3','d3','c#3','c3'];
+      function refreshPianoRoll() {
+        const rollEl = document.getElementById('sound-piano-roll');
+        if (!rollEl) return;
+        const steps = tokenizeSoundString(soundBank[selectedSoundSlot] || '');
+        while (steps.length < PATTERN_STEPS) steps.push({ noteStr: '-', volume: 100, waveform: 'triangle', effects: [] });
+        rollEl.innerHTML = '';
+        const totalRows = 1 + PIANO_ROLL_NOTE_ROWS.length;
+        rollEl.style.gridTemplateRows = 'repeat(' + totalRows + ', auto)';
+        const emptyLabel = document.createElement('div');
+        emptyLabel.className = 'roll-label';
+        emptyLabel.style.gridRow = '1';
+        emptyLabel.style.gridColumn = '1';
+        rollEl.appendChild(emptyLabel);
+        for (let c = 0; c < 16; c++) {
+          const h = document.createElement('div');
+          h.className = 'roll-label';
+          h.textContent = c;
+          h.style.gridRow = '1';
+          h.style.gridColumn = String(c + 2);
+          rollEl.appendChild(h);
+        }
+        for (let r = 0; r < PIANO_ROLL_NOTE_ROWS.length; r++) {
+          const noteStr = PIANO_ROLL_NOTE_ROWS[r];
+          const label = document.createElement('div');
+          label.className = 'roll-label';
+          label.textContent = noteStr === '-' ? 'rest' : noteStr;
+          label.style.gridRow = String(r + 2);
+          label.style.gridColumn = '1';
+          rollEl.appendChild(label);
+          for (let c = 0; c < 16; c++) {
+            const cell = document.createElement('div');
+            cell.className = 'roll-cell' + (noteStr === '-' ? ' rest-row' : '');
+            cell.dataset.row = String(r);
+            cell.dataset.col = String(c);
+            const step = steps[c] || {};
+            const stepNote = (step.noteStr || '-').toLowerCase().replace(/\s/g, '');
+            if (stepNote === noteStr) cell.classList.add('active');
+            cell.addEventListener('click', () => {
+              const stepsCopy = tokenizeSoundString(soundBank[selectedSoundSlot] || '');
+              while (stepsCopy.length < PATTERN_STEPS) stepsCopy.push({ noteStr: '-', volume: 100, waveform: 'triangle', effects: [] });
+              const current = stepsCopy[c] || { noteStr: '-', volume: 100, waveform: 'triangle', effects: [] };
+              stepsCopy[c] = { ...current, noteStr: noteStr };
+              soundBank[selectedSoundSlot] = buildSoundString(stepsCopy);
+              const inputEl = document.getElementById('sound-input-' + selectedSoundSlot);
+              if (inputEl) inputEl.value = soundBank[selectedSoundSlot];
+              refreshPatternStrip();
+              refreshPianoRoll();
+            });
+            cell.style.gridRow = String(r + 2);
+            cell.style.gridColumn = String(c + 2);
+            rollEl.appendChild(cell);
+          }
+        }
+        if (typeof updatePlayheadVisual === 'function') updatePlayheadVisual();
+      }
+      function refreshPatternStrip() {
+        if (!stripEl) return;
+        const steps = tokenizeSoundString(soundBank[selectedSoundSlot] || '');
+        while (steps.length < PATTERN_STEPS) steps.push({ noteStr: '-', volume: 100, waveform: 'triangle', effects: [] });
+        const cellCount = stripEl.children.length;
+        for (let idx = 0; idx < PATTERN_STEPS; idx++) {
+          const step = steps[idx] || { noteStr: '-', volume: 100, waveform: 'triangle', effects: [] };
+          let cell = stripEl.children[idx];
+          if (!cell) {
+            cell = document.createElement('div');
+            cell.className = 'sound-step-cell';
+            cell.dataset.step = String(idx);
+            cell.innerHTML = '<span class="sound-step-note">-</span><span class="sound-step-wave">tri</span><div class="sound-step-vol"><div class="sound-step-vol-inner" style="width:100%"></div></div><span class="sound-step-idx">' + idx + '</span>';
+            cell.addEventListener('click', (e) => {
+              e.stopPropagation();
+              editingStepIndex = idx;
+              const st = tokenizeSoundString(soundBank[selectedSoundSlot] || '');
+              while (st.length <= idx) st.push({ noteStr: '-', volume: 100, waveform: 'triangle', effects: [] });
+              openStepPopover(cell, st[idx] || { noteStr: '-', volume: 100, waveform: 'triangle', effects: [] });
+            });
+            stripEl.appendChild(cell);
+          }
+          cell.classList.toggle('rest', step.noteStr === '-');
+          cell.querySelector('.sound-step-note').textContent = step.noteStr === '-' ? '-' : step.noteStr.toUpperCase();
+          const waveEl = cell.querySelector('.sound-step-wave');
+          waveEl.textContent = step.instrument ? (INSTRUMENT_OPTIONS.find(o => o.id === step.instrument)?.label?.split(' / ')[0] || step.instrument) : (step.waveform || 'tri').slice(0, 3);
+          cell.querySelector('.sound-step-vol-inner').style.width = (step.volume || 100) + '%';
+          const idxEl = cell.querySelector('.sound-step-idx');
+          if (idxEl) idxEl.textContent = idx;
+        }
+        const inputEl = document.getElementById('sound-input-' + selectedSoundSlot);
+        if (inputEl) inputEl.value = soundBank[selectedSoundSlot];
+        if (typeof refreshPianoRoll === 'function') refreshPianoRoll();
+      }
+      function applyStepEdit(update) {
+        const steps = tokenizeSoundString(soundBank[selectedSoundSlot] || '');
+        while (steps.length < PATTERN_STEPS) steps.push({ noteStr: '-', volume: 100, waveform: 'triangle', effects: [] });
+        const current = steps[editingStepIndex] || { noteStr: '-', volume: 100, waveform: 'triangle', effects: [] };
+        steps[editingStepIndex] = { ...current, ...update };
+        soundBank[selectedSoundSlot] = buildSoundString(steps);
+        const inputEl = document.getElementById('sound-input-' + selectedSoundSlot);
+        if (inputEl) inputEl.value = soundBank[selectedSoundSlot];
+        refreshPatternStrip();
+      }
+      const EFFECT_PRESETS = ['reverb:small', 'echo:short', 'envelope:pluck', 'envelope:perc', 'hp:bright', 'lp:dark'];
+      function openStepPopover(anchorCell, step) {
+        if (!popoverEl || !popoverNoteKeys) return;
+        if (stripEl) stripEl.querySelectorAll('.sound-step-cell').forEach(c => c.classList.remove('editing'));
+        anchorCell.classList.add('editing');
+        popoverEl.style.display = 'block';
+        const rect = anchorCell.getBoundingClientRect();
+        const popoverW = 280;
+        const popoverH = 420;
+        const pad = 12;
+        let left = rect.left + rect.width / 2 - popoverW / 2;
+        let top = rect.bottom + 8;
+        left = Math.max(pad, Math.min(window.innerWidth - popoverW - pad, left));
+        top = Math.max(pad, Math.min(window.innerHeight - popoverH - pad, top));
+        popoverEl.style.left = left + 'px';
+        popoverEl.style.top = top + 'px';
+        const stepNumEl = document.getElementById('sound-popover-step-num');
+        if (stepNumEl) stepNumEl.textContent = String(editingStepIndex);
+        const wavePreviewCanvas = document.getElementById('sound-wave-preview');
+        if (wavePreviewCanvas) drawWaveformPreview(wavePreviewCanvas, step.waveform || 'triangle');
+        popoverVol.value = step.volume || 100;
+        if (popoverVolVal) popoverVolVal.textContent = String(step.volume || 100);
+        popoverEl.querySelectorAll('.sound-wave-btn').forEach(btn => {
+          btn.classList.toggle('active', (btn.dataset.wave || '') === (step.waveform || 'triangle'));
+        });
+        const instrumentSelect = document.getElementById('sound-popover-instrument');
+        if (instrumentSelect) {
+          if (instrumentSelect.options.length <= 1) {
+            INSTRUMENT_OPTIONS.forEach(o => {
+              const opt = document.createElement('option');
+              opt.value = o.id;
+              opt.textContent = o.label;
+              instrumentSelect.appendChild(opt);
+            });
+          }
+          instrumentSelect.value = step.instrument || '';
+          instrumentSelect.onchange = () => {
+            const val = instrumentSelect.value || null;
+            applyStepEdit({ instrument: val });
+            if (val) popoverEl.querySelectorAll('.sound-wave-btn').forEach(b => b.classList.remove('active'));
+          };
+        }
+        const effectsEl = document.getElementById('sound-popover-effects');
+        if (effectsEl) {
+          effectsEl.innerHTML = '';
+          const effects = step.effects || [];
+          EFFECT_PRESETS.forEach(eff => {
+            const pill = document.createElement('button');
+            pill.type = 'button';
+            pill.className = 'sound-effect-pill' + (effects.includes(eff) ? ' active' : '');
+            pill.textContent = eff.replace(':', ' ');
+            pill.addEventListener('click', () => {
+              const steps = tokenizeSoundString(soundBank[selectedSoundSlot] || '');
+              while (steps.length <= editingStepIndex) steps.push({ noteStr: '-', volume: 100, waveform: 'triangle', effects: [] });
+              const s = steps[editingStepIndex];
+              const next = s.effects ? (s.effects.includes(eff) ? s.effects.filter(e => e !== eff) : [...s.effects, eff]) : [eff];
+              applyStepEdit({ effects: next });
+              pill.classList.toggle('active', next.includes(eff));
+            });
+            effectsEl.appendChild(pill);
+          });
+        }
+        popoverNoteKeys.innerHTML = '';
+        for (let oct = 3; oct <= 5; oct++) {
+          for (let n = 0; n < 12; n++) {
+            const noteStr = NOTE_LABELS[n] + oct;
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'sound-note-key' + (NOTE_LABELS[n].length > 1 ? ' black' : '');
+            btn.textContent = noteStr;
+            btn.addEventListener('click', () => {
+              applyStepEdit({ noteStr });
+              const st = tokenizeSoundString(soundBank[selectedSoundSlot] || '');
+              openStepPopover(anchorCell, st[editingStepIndex] || { noteStr, volume: 100, waveform: 'triangle', effects: [] });
+            });
+            popoverNoteKeys.appendChild(btn);
+          }
+        }
+        popoverVol.oninput = () => {
+          const v = parseInt(popoverVol.value, 10);
+          if (popoverVolVal) popoverVolVal.textContent = String(v);
+          applyStepEdit({ volume: v });
+        };
+        popoverEl.querySelectorAll('.sound-wave-btn').forEach(btn => {
+          btn.onclick = () => {
+            const w = btn.dataset.wave || 'triangle';
+            popoverEl.querySelectorAll('.sound-wave-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            applyStepEdit({ waveform: w, instrument: null });
+            if (instrumentSelect) instrumentSelect.value = '';
+            if (wavePreviewCanvas) drawWaveformPreview(wavePreviewCanvas, w);
+          };
+        });
+        const playHereBtn = document.getElementById('sound-popover-play-here');
+        if (playHereBtn) playHereBtn.onclick = () => {
+          const steps = tokenizeSoundString(soundBank[selectedSoundSlot] || '');
+          const from = steps.slice(editingStepIndex);
+          if (from.length) playSoundString(buildSoundString(from));
+        };
+        if (popoverRestBtn) popoverRestBtn.onclick = () => {
+          applyStepEdit({ noteStr: '-' });
+          closePopover();
+        };
+        const doneBtn = document.getElementById('sound-popover-done');
+        if (doneBtn) doneBtn.onclick = closePopover;
+      }
+      document.addEventListener('click', (e) => {
+        if (popoverEl && popoverEl.style.display === 'block' && !popoverEl.contains(e.target) && !e.target.closest('.sound-step-cell')) closePopover();
+      });
+      refreshPatternStrip();
+      const slotNumEl = document.getElementById('sound-pattern-slot-num');
+      if (slotNumEl) slotNumEl.textContent = String(selectedSoundSlot);
+      const copySlotBtn = document.getElementById('sound-copy-slot');
+      const pasteSlotBtn = document.getElementById('sound-paste-slot');
+      if (copySlotBtn) copySlotBtn.addEventListener('click', () => {
+        const s = soundBank[selectedSoundSlot] || '';
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(s).catch(() => {});
+        else if (document.execCommand) { const ta = document.createElement('textarea'); ta.value = s; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); }
+      });
+      if (pasteSlotBtn) pasteSlotBtn.addEventListener('click', () => {
+        const read = () => {
+          if (navigator.clipboard && navigator.clipboard.readText) return navigator.clipboard.readText();
+          return Promise.resolve('');
+        };
+        read().then(text => {
+          if (text && text.trim()) {
+            soundBank[selectedSoundSlot] = text.trim();
+            const inputEl = document.getElementById('sound-input-' + selectedSoundSlot);
+            if (inputEl) inputEl.value = soundBank[selectedSoundSlot];
+            if (typeof refreshPatternStrip === 'function') refreshPatternStrip();
+          }
+        }).catch(() => {});
+      });
+      function playPatternFromEditor(loop) {
+        if (patternPlayIntervalId) clearInterval(patternPlayIntervalId);
+        patternPlayIntervalId = null;
+        if (soundPlayheadIntervalId != null) clearInterval(soundPlayheadIntervalId);
+        soundPlayheadIntervalId = null;
+        setSoundPlayhead(-1);
+        const fromStep = Math.max(0, Math.min(15, parseInt(document.getElementById('sound-play-from-step')?.value || '0', 10) || 0));
+        const steps = tokenizeSoundString(soundBank[selectedSoundSlot] || '');
+        if (steps.length === 0) return;
+        const slice = steps.slice(fromStep);
+        if (slice.length === 0) return;
+        const str = buildSoundString(slice);
+        const stepMs = 180;
+        const oneShotStepMs = 56;
+        if (!loop) {
+          setSoundPlayhead(fromStep + 0);
+          playSoundString(str);
+          let i = 1;
+          soundPlayheadIntervalId = window.setInterval(() => {
+            if (i < slice.length) setSoundPlayhead(fromStep + i);
+            i++;
+            if (i >= slice.length) {
+              clearInterval(soundPlayheadIntervalId);
+              soundPlayheadIntervalId = null;
+              setTimeout(() => setSoundPlayhead(-1), oneShotStepMs);
+            }
+          }, oneShotStepMs);
+          return;
+        }
+        const stopBtn = document.getElementById('sound-stop-pattern');
+        if (stopBtn) stopBtn.style.display = 'inline-block';
+        const playBtn = document.getElementById('sound-play-pattern');
+        if (playBtn) playBtn.textContent = 'Stop';
+        let step = 0;
+        patternPlayIntervalId = setInterval(() => {
+          setSoundPlayhead(fromStep + (step % slice.length));
+          const token = (slice[step % slice.length] || {});
+          const one = buildSoundString([token]);
+          playSoundString(one);
+          step++;
+        }, stepMs);
+      }
+      function stopPatternPlay() {
+        if (patternPlayIntervalId) clearInterval(patternPlayIntervalId);
+        patternPlayIntervalId = null;
+        if (soundPlayheadIntervalId != null) clearInterval(soundPlayheadIntervalId);
+        soundPlayheadIntervalId = null;
+        setSoundPlayhead(-1);
+        const stopBtn = document.getElementById('sound-stop-pattern');
+        if (stopBtn) stopBtn.style.display = 'none';
+        const playBtn = document.getElementById('sound-play-pattern');
+        if (playBtn) playBtn.textContent = 'Play';
+      }
+      const playPatternBtn = document.getElementById('sound-play-pattern');
+      if (playPatternBtn) {
+        playPatternBtn.addEventListener('click', () => {
+          const loop = document.getElementById('sound-play-loop')?.checked ?? false;
+          if (loop && patternPlayIntervalId) {
+            stopPatternPlay();
+            return;
+          }
+          playPatternFromEditor(loop);
+        });
+      }
+      const stopPatternBtn = document.getElementById('sound-stop-pattern');
+      if (stopPatternBtn) {
+        stopPatternBtn.addEventListener('click', () => stopPatternPlay());
+      }
+      document.addEventListener('keydown', (e) => {
+        if (e.code !== 'Space') return;
+        const panel = document.getElementById('panel-sounds');
+        if (!panel || !panel.classList.contains('active')) return;
+        const target = e.target;
+        if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return;
+        e.preventDefault();
+        stopPatternPlay();
+        const loop = document.getElementById('sound-play-loop')?.checked ?? false;
+        const fromStep = Math.max(0, Math.min(15, parseInt(document.getElementById('sound-play-from-step')?.value || '0', 10) || 0));
+        const steps = tokenizeSoundString(soundBank[selectedSoundSlot] || '');
+        if (steps.length === 0) { playSoundString(soundBank[selectedSoundSlot]); return; }
+        const slice = steps.slice(fromStep);
+        playPatternFromEditor(loop);
+      });
+      function appendToCurrentSlot(append) {
+        const cur = soundBank[selectedSoundSlot] || '';
+        soundBank[selectedSoundSlot] = (cur.trim() ? cur.trim() + ' ' : '') + append.trim();
+        const inputEl = document.getElementById('sound-input-' + selectedSoundSlot);
+        if (inputEl) inputEl.value = soundBank[selectedSoundSlot];
+        const row = grid.querySelector('.sound-slot-row.selected');
+        if (row) {
+          const p = row.querySelector('.sound-slot-preview');
+          if (p) { p.textContent = (soundBank[selectedSoundSlot] || '—').slice(0, 24); p.title = soundBank[selectedSoundSlot] || '—'; }
+        }
+        if (typeof refreshPatternStrip === 'function') refreshPatternStrip();
+      }
+      document.getElementById('sound-insert-chord')?.addEventListener('click', () => appendToCurrentSlot('c4 e4 g4'));
+      document.getElementById('sound-insert-arpeggio')?.addEventListener('click', () => appendToCurrentSlot('c4|envelope:pluck e4|envelope:pluck g4|envelope:pluck c5|envelope:pluck'));
+      document.getElementById('sound-insert-scale')?.addEventListener('click', () => appendToCurrentSlot('c4 d4 e4 f4 g4 a4 b4 c5'));
+      document.getElementById('sound-insert-rests')?.addEventListener('click', () => appendToCurrentSlot('- - - -'));
+      document.querySelectorAll('.sound-insert-example').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const str = btn.getAttribute('data-insert') || '';
+          soundBank[selectedSoundSlot] = str;
+          const inputEl = document.getElementById('sound-input-' + selectedSoundSlot);
+          if (inputEl) inputEl.value = str;
+          const row = grid.querySelector('.sound-slot-row.selected');
+          if (row) {
+            const p = row.querySelector('.sound-slot-preview');
+            if (p) { p.textContent = (str || '—').slice(0, 24); p.title = str || '—'; }
+          }
+          if (typeof refreshPatternStrip === 'function') refreshPatternStrip();
+        });
+      });
+      if (hintEl) hintEl.textContent = 'Selected: 0 — k7.sfx(0) · Space to test';
+    }
+
+    function initSfxChainEditor() {
+      const selectEl = document.getElementById('sfx-chain-select');
+      const stepsEl = document.getElementById('sfx-chain-steps');
+      const addBtn = document.getElementById('sfx-chain-add-step');
+      const playBtn = document.getElementById('sfx-chain-play');
+      const stopBtn = document.getElementById('sfx-chain-stop');
+      const clearBtn = document.getElementById('sfx-chain-clear');
+      if (!selectEl || !stepsEl) return;
+
+      let chainPlayTimeoutIds = [];
+      let chainPlayStepIndex = -1;
+
+      function setChainPlayhead(stepIndex) {
+        chainPlayStepIndex = stepIndex;
+        stepsEl.querySelectorAll('.sfx-chain-step-row').forEach((row, i) => row.classList.toggle('playing', i === stepIndex));
+      }
+
+      function stopChainPlay() {
+        chainPlayTimeoutIds.forEach(id => clearTimeout(id));
+        chainPlayTimeoutIds = [];
+        setChainPlayhead(-1);
+        if (stopBtn) stopBtn.style.display = 'none';
+        if (playBtn) playBtn.style.display = 'inline-block';
+      }
+
+      function renderChainSteps() {
+        const id = Math.max(0, Math.min(SFX_CHAIN_COUNT - 1, parseInt(selectEl.value, 10) || 0));
+        const steps = sfxChains[id] || [];
+        stepsEl.innerHTML = '';
+        steps.forEach((step, idx) => {
+          const row = document.createElement('div');
+          row.className = 'sfx-chain-step-row' + (idx === chainPlayStepIndex ? ' playing' : '');
+          row.style.display = 'flex';
+          row.style.alignItems = 'center';
+          row.style.gap = '8px';
+          const stepIndexSpan = document.createElement('span');
+          stepIndexSpan.className = 'step-index';
+          stepIndexSpan.textContent = String(idx);
+          const slotSelect = document.createElement('select');
+          slotSelect.style.background = '#2a2a3e';
+          slotSelect.style.color = '#eee';
+          slotSelect.style.border = '1px solid #444';
+          slotSelect.style.borderRadius = '4px';
+          slotSelect.style.padding = '4px 6px';
+          slotSelect.style.fontSize = '12px';
+          slotSelect.style.width = '48px';
+          for (let i = 0; i < SOUND_SLOTS; i++) {
+            const opt = document.createElement('option');
+            opt.value = i;
+            opt.textContent = String(i);
+            if (Number(step.slot) === i) opt.selected = true;
+            slotSelect.appendChild(opt);
+          }
+          slotSelect.addEventListener('change', () => { sfxChains[id][idx].slot = parseInt(slotSelect.value, 10); });
+          const delayInput = document.createElement('input');
+          delayInput.type = 'number';
+          delayInput.min = 0;
+          delayInput.max = 2000;
+          delayInput.step = 50;
+          delayInput.value = step.delay || 0;
+          delayInput.style.width = '64px';
+          delayInput.style.background = '#2a2a3e';
+          delayInput.style.color = '#eee';
+          delayInput.style.border = '1px solid #444';
+          delayInput.style.borderRadius = '4px';
+          delayInput.style.padding = '4px 6px';
+          delayInput.style.fontSize = '12px';
+          delayInput.addEventListener('input', () => { sfxChains[id][idx].delay = Math.max(0, parseInt(delayInput.value, 10) || 0); });
+          const removeBtn = document.createElement('button');
+          removeBtn.type = 'button';
+          removeBtn.className = 'btn';
+          removeBtn.textContent = '−';
+          removeBtn.style.padding = '2px 8px';
+          removeBtn.title = 'Remove step';
+          removeBtn.addEventListener('click', () => {
+            sfxChains[id].splice(idx, 1);
+            if (sfxChains[id].length === 0) sfxChains[id].push({ slot: 0, delay: 0 });
+            renderChainSteps();
+          });
+          const label = document.createElement('span');
+          label.style.color = '#888';
+          label.style.fontSize = '11px';
+          label.textContent = 'ms';
+          row.appendChild(stepIndexSpan);
+          row.appendChild(slotSelect);
+          row.appendChild(delayInput);
+          row.appendChild(label);
+          row.appendChild(removeBtn);
+          stepsEl.appendChild(row);
+        });
+      }
+
+      selectEl.addEventListener('change', () => { stopChainPlay(); renderChainSteps(); });
+      if (addBtn) addBtn.addEventListener('click', () => {
+        const id = Math.max(0, Math.min(SFX_CHAIN_COUNT - 1, parseInt(selectEl.value, 10) || 0));
+        sfxChains[id].push({ slot: 0, delay: 200 });
+        renderChainSteps();
+      });
+      if (playBtn) playBtn.addEventListener('click', () => {
+        const id = Math.max(0, Math.min(SFX_CHAIN_COUNT - 1, parseInt(selectEl.value, 10) || 0));
+        const steps = sfxChains[id] || [];
+        if (steps.length === 0) return;
+        stopChainPlay();
+        let t = 0;
+        steps.forEach((s, idx) => {
+          const slot = Math.max(0, Math.min(SOUND_SLOTS - 1, Number(s.slot) | 0));
+          const delay = Math.max(0, Number(s.delay) | 0);
+          t += delay;
+          const idToUse = setTimeout(() => {
+            setChainPlayhead(idx);
+            if (soundBank[slot]) playSoundString(soundBank[slot]);
+            if (idx === steps.length - 1) setTimeout(() => stopChainPlay(), 100);
+          }, t);
+          chainPlayTimeoutIds.push(idToUse);
+        });
+        if (steps.length > 0 && steps[0].delay === 0) setChainPlayhead(0);
+        if (stopBtn) stopBtn.style.display = 'inline-block';
+        if (playBtn) playBtn.style.display = 'none';
+      });
+      if (stopBtn) stopBtn.addEventListener('click', stopChainPlay);
+      if (clearBtn) clearBtn.addEventListener('click', () => {
+        const id = Math.max(0, Math.min(SFX_CHAIN_COUNT - 1, parseInt(selectEl.value, 10) || 0));
+        stopChainPlay();
+        sfxChains[id] = [{ slot: 0, delay: 0 }];
+        renderChainSteps();
+      });
+      renderChainSteps();
+    }
+
+    function initSpriteEditor() {
+      const canvas = document.getElementById('sprite-sheet-canvas');
+      const paletteEl = document.getElementById('sprite-palette');
+      const hintEl = document.getElementById('sprite-hint');
+      const zoomCanvas = document.getElementById('sprite-zoom-canvas');
+      const spriteSelectNum = document.getElementById('sprite-select-num');
+      const toolPencil = document.getElementById('sprite-tool-pencil');
+      const toolEraser = document.getElementById('sprite-tool-eraser');
+      const toolFill = document.getElementById('sprite-tool-fill');
+      if (!canvas || !paletteEl) return;
+      const ctx = canvas.getContext('2d');
+      const zoomCtx = zoomCanvas ? zoomCanvas.getContext('2d') : null;
+      const sheetW = 256, sheetH = 64;
+      const ZOOM = 4;
+      const ZOOM_PIX = 16;
+      const canvasW = sheetW * ZOOM, canvasH = sheetH * ZOOM;
+      canvas.width = canvasW;
+      canvas.height = canvasH;
+      let selectedColor = 7;
+      let selectedSpriteIndex = 0;
+      let currentTool = 'pencil';
+
+      PALETTE.forEach((rgba, i) => {
+        const span = document.createElement('span');
+        span.style.backgroundColor = `rgb(${rgba[0]},${rgba[1]},${rgba[2]})`;
+        span.title = 'Color ' + i;
+        if (i === selectedColor) span.classList.add('selected');
+        span.addEventListener('click', () => {
+          paletteEl.querySelectorAll('span').forEach(s => s.classList.remove('selected'));
+          span.classList.add('selected');
+          selectedColor = i;
+        });
+        paletteEl.appendChild(span);
+      });
+
+      function setTool(tool) {
+        currentTool = tool;
+        [toolPencil, toolEraser, toolFill].forEach(btn => { if (btn) btn.classList.remove('active'); });
+        if (tool === 'pencil' && toolPencil) toolPencil.classList.add('active');
+        if (tool === 'eraser' && toolEraser) toolEraser.classList.add('active');
+        if (tool === 'fill' && toolFill) toolFill.classList.add('active');
+      }
+      if (toolPencil) toolPencil.addEventListener('click', () => setTool('pencil'));
+      if (toolEraser) toolEraser.addEventListener('click', () => setTool('eraser'));
+      if (toolFill) toolFill.addEventListener('click', () => setTool('fill'));
+
+      const pickerStrip = document.getElementById('sprite-picker-strip');
+      const pickerPrev = document.getElementById('sprite-picker-prev');
+      const pickerNext = document.getElementById('sprite-picker-next');
+      const pickerRange = document.getElementById('sprite-picker-range');
+      let pickerPage = 0;
+      const PICKER_PER_PAGE = 32;
+
+      if (spriteSelectNum) {
+        spriteSelectNum.addEventListener('change', () => {
+          selectedSpriteIndex = Math.max(0, Math.min(255, spriteSelectNum.valueAsNumber | 0));
+          spriteSelectNum.value = selectedSpriteIndex;
+          pickerPage = Math.floor(selectedSpriteIndex / PICKER_PER_PAGE);
+          if (pickerRange) pickerRange.textContent = (pickerPage * PICKER_PER_PAGE) + '\u2013' + (pickerPage * PICKER_PER_PAGE + PICKER_PER_PAGE - 1);
+          refreshSpritePicker();
+          refreshSpriteZoom();
+        });
+      }
+
+      function refreshSpritePicker() {
+        if (!pickerStrip || !globalThis.k7 || typeof globalThis.k7.get_sprite_sheet !== 'function') return;
+        const data = globalThis.k7.get_sprite_sheet();
+        if (!data || data.length < sheetW * sheetH) return;
+        while (pickerStrip.firstChild) pickerStrip.removeChild(pickerStrip.firstChild);
+        for (let i = 0; i < PICKER_PER_PAGE; i++) {
+          const n = pickerPage * PICKER_PER_PAGE + i;
+          const c = document.createElement('canvas');
+          c.width = 8;
+          c.height = 8;
+          c.dataset.spriteId = String(n);
+          c.title = 'Sprite ' + n;
+          const cctx = c.getContext('2d');
+          const baseX = (n % 32) * 8;
+          const baseY = (n >> 5) * 8;
+          for (let py = 0; py < 8; py++) {
+            for (let px = 0; px < 8; px++) {
+              const col = PALETTE[data[(baseY + py) * sheetW + (baseX + px)] & 15] || PALETTE[0];
+              cctx.fillStyle = `rgb(${col[0]},${col[1]},${col[2]})`;
+              cctx.fillRect(px, py, 1, 1);
+            }
+          }
+          if (n === selectedSpriteIndex) c.classList.add('selected');
+          c.addEventListener('click', () => {
+            selectedSpriteIndex = n;
+            if (spriteSelectNum) spriteSelectNum.value = selectedSpriteIndex;
+            pickerStrip.querySelectorAll('canvas').forEach(el => el.classList.remove('selected'));
+            c.classList.add('selected');
+            refreshSpriteZoom();
+          });
+          pickerStrip.appendChild(c);
+        }
+        if (pickerRange) pickerRange.textContent = (pickerPage * PICKER_PER_PAGE) + '\u2013' + (pickerPage * PICKER_PER_PAGE + PICKER_PER_PAGE - 1);
+      }
+
+      if (pickerPrev) pickerPrev.addEventListener('click', () => {
+        pickerPage = Math.max(0, pickerPage - 1);
+        refreshSpritePicker();
+      });
+      if (pickerNext) pickerNext.addEventListener('click', () => {
+        pickerPage = Math.min(7, pickerPage + 1);
+        refreshSpritePicker();
+      });
+
+      function refreshSpriteSheet() {
+        const k7 = globalThis.k7;
+        if (!k7 || typeof k7.get_sprite_sheet !== 'function') return;
+        const data = k7.get_sprite_sheet();
+        if (!data || data.length < sheetW * sheetH) return;
+        for (let sy = 0; sy < sheetH; sy++) {
+          for (let sx = 0; sx < sheetW; sx++) {
+            const c = PALETTE[data[sy * sheetW + sx] & 15] || PALETTE[0];
+            ctx.fillStyle = `rgb(${c[0]},${c[1]},${c[2]})`;
+            ctx.fillRect(sx * ZOOM, sy * ZOOM, ZOOM, ZOOM);
+          }
+        }
+        ctx.strokeStyle = 'rgba(100, 140, 180, 0.5)';
+        ctx.lineWidth = 1;
+        for (let i = 0; i <= 32; i++) {
+          ctx.beginPath();
+          ctx.moveTo(i * 8 * ZOOM, 0);
+          ctx.lineTo(i * 8 * ZOOM, canvasH);
+          ctx.stroke();
+        }
+        for (let j = 0; j <= 8; j++) {
+          ctx.beginPath();
+          ctx.moveTo(0, j * 8 * ZOOM);
+          ctx.lineTo(canvasW, j * 8 * ZOOM);
+          ctx.stroke();
+        }
+        refreshSpriteZoom();
+        refreshSpritePicker();
+      }
+
+      function refreshSpriteZoom() {
+        if (!zoomCtx || !globalThis.k7 || typeof globalThis.k7.get_sprite_sheet !== 'function') return;
+        const data = globalThis.k7.get_sprite_sheet();
+        if (!data || data.length < sheetW * sheetH) return;
+        const baseX = (selectedSpriteIndex % 32) * 8;
+        const baseY = (selectedSpriteIndex >> 5) * 8;
+        for (let py = 0; py < 8; py++) {
+          for (let px = 0; px < 8; px++) {
+            const c = PALETTE[data[(baseY + py) * sheetW + (baseX + px)] & 15] || PALETTE[0];
+            zoomCtx.fillStyle = `rgb(${c[0]},${c[1]},${c[2]})`;
+            zoomCtx.fillRect(px * ZOOM_PIX, py * ZOOM_PIX, ZOOM_PIX, ZOOM_PIX);
+          }
+        }
+        zoomCtx.strokeStyle = 'rgba(100, 140, 180, 0.6)';
+        zoomCtx.lineWidth = 1;
+        for (let i = 0; i <= 8; i++) {
+          zoomCtx.beginPath();
+          zoomCtx.moveTo(i * ZOOM_PIX, 0);
+          zoomCtx.lineTo(i * ZOOM_PIX, 128);
+          zoomCtx.stroke();
+          zoomCtx.beginPath();
+          zoomCtx.moveTo(0, i * ZOOM_PIX);
+          zoomCtx.lineTo(128, i * ZOOM_PIX);
+          zoomCtx.stroke();
+        }
+      }
+
+      function getSheetCoords(e) {
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvasW / rect.width;
+        const scaleY = canvasH / rect.height;
+        const canvasX = (e.clientX - rect.left) * scaleX;
+        const canvasY = (e.clientY - rect.top) * scaleY;
+        const sx = Math.floor(canvasX / ZOOM);
+        const sy = Math.floor(canvasY / ZOOM);
+        return { sx: Math.max(0, Math.min(sx, sheetW - 1)), sy: Math.max(0, Math.min(sy, sheetH - 1)) };
+      }
+
+      function getZoomPixelCoords(e) {
+        if (!zoomCanvas) return null;
+        const rect = zoomCanvas.getBoundingClientRect();
+        const scaleX = 8 / rect.width;
+        const scaleY = 8 / rect.height;
+        const px = Math.floor((e.clientX - rect.left) * scaleX);
+        const py = Math.floor((e.clientY - rect.top) * scaleY);
+        return { px: Math.max(0, Math.min(px, 7)), py: Math.max(0, Math.min(py, 7)) };
+      }
+
+      function spriteIndex(sx, sy) {
+        return (sy >> 3) * 32 + (sx >> 3);
+      }
+
+      canvas.addEventListener('mousemove', (e) => {
+        const { sx, sy } = getSheetCoords(e);
+        if (hintEl) hintEl.textContent = 'Sprite ' + spriteIndex(sx, sy) + ' — click to select, edit in zoom below';
+      });
+      canvas.addEventListener('mouseleave', () => {
+        if (hintEl) hintEl.textContent = 'Click a sprite to select it — edit in the zoom window below';
+      });
+
+      canvas.addEventListener('mousedown', (e) => {
+        const { sx, sy } = getSheetCoords(e);
+        selectedSpriteIndex = spriteIndex(sx, sy);
+        if (spriteSelectNum) spriteSelectNum.value = selectedSpriteIndex;
+        pickerPage = Math.floor(selectedSpriteIndex / PICKER_PER_PAGE);
+        refreshSpritePicker();
+        refreshSpriteZoom();
+      });
+
+      if (zoomCanvas) {
+        zoomCanvas.addEventListener('mousedown', (e) => {
+          const k7 = globalThis.k7;
+          if (!k7 || typeof k7.sset !== 'function') return;
+          const pos = getZoomPixelCoords(e);
+          if (!pos) return;
+          const baseX = (selectedSpriteIndex % 32) * 8;
+          const baseY = (selectedSpriteIndex >> 5) * 8;
+          const sx = baseX + pos.px, sy = baseY + pos.py;
+          if (currentTool === 'fill') {
+            const fillColor = selectedColor;
+            for (let dy = 0; dy < 8; dy++)
+              for (let dx = 0; dx < 8; dx++)
+                k7.sset(baseX + dx, baseY + dy, fillColor);
+          } else {
+            const color = currentTool === 'eraser' ? 0 : selectedColor;
+            k7.sset(sx, sy, color);
+          }
+          refreshSpriteSheet();
+          const move = (e2) => {
+            const p = getZoomPixelCoords(e2);
+            if (!p) return;
+            if (currentTool === 'fill') return;
+            const sx2 = baseX + p.px, sy2 = baseY + p.py;
+            k7.sset(sx2, sy2, currentTool === 'eraser' ? 0 : selectedColor);
+            refreshSpriteSheet();
+          };
+          window.addEventListener('mousemove', move);
+          window.addEventListener('mouseup', () => window.removeEventListener('mousemove', move), { once: true });
+        });
+      }
+
+      document.querySelector('.tabs button[data-tab="sprites"]')?.addEventListener('click', () => {
+        refreshSpriteSheet();
+        if (spriteSelectNum) spriteSelectNum.value = selectedSpriteIndex;
+        refreshSpritePicker();
+      });
+      refreshSpriteSheet();
+      refreshSpritePicker();
+    }
+
+    function initMapEditor() {
+      const canvas = document.getElementById('map-canvas');
+      const spriteIdInput = document.getElementById('map-sprite-id');
+      const hintEl = document.getElementById('map-hint');
+      if (!canvas || !spriteIdInput) return;
+      const ctx = canvas.getContext('2d');
+      const mapW = 256, mapH = 32;
+      const TILE = 8;
+      const canvasW = mapW * TILE, canvasH = mapH * TILE;
+      canvas.width = canvasW;
+      canvas.height = canvasH;
+
+      function refreshMap() {
+        const k7 = globalThis.k7;
+        if (!k7 || typeof k7.get_map !== 'function' || typeof k7.get_sprite_sheet !== 'function') return;
+        const mapData = k7.get_map();
+        const sheetData = k7.get_sprite_sheet();
+        if (!mapData || mapData.length < mapW * mapH || !sheetData || sheetData.length < 256 * 64) return;
+        for (let cy = 0; cy < mapH; cy++) {
+          for (let cx = 0; cx < mapW; cx++) {
+            const spriteId = mapData[cy * mapW + cx] & 255;
+            const sheetX = (spriteId % 32) * TILE;
+            const sheetY = (spriteId >> 5) * TILE;
+            for (let dy = 0; dy < TILE; dy++) {
+              for (let dx = 0; dx < TILE; dx++) {
+                const c = PALETTE[(sheetData[(sheetY + dy) * 256 + (sheetX + dx)] & 15)] || PALETTE[0];
+                ctx.fillStyle = `rgb(${c[0]},${c[1]},${c[2]})`;
+                ctx.fillRect(cx * TILE + dx, cy * TILE + dy, 1, 1);
+              }
+            }
+          }
+        }
+        ctx.strokeStyle = 'rgba(100, 140, 180, 0.4)';
+        ctx.lineWidth = 1;
+        for (let i = 0; i <= mapW; i++) {
+          ctx.beginPath();
+          ctx.moveTo(i * TILE, 0);
+          ctx.lineTo(i * TILE, canvasH);
+          ctx.stroke();
+        }
+        for (let j = 0; j <= mapH; j++) {
+          ctx.beginPath();
+          ctx.moveTo(0, j * TILE);
+          ctx.lineTo(canvasW, j * TILE);
+          ctx.stroke();
+        }
+      }
+
+      function getCellCoords(e) {
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvasW / rect.width;
+        const scaleY = canvasH / rect.height;
+        const canvasX = (e.clientX - rect.left) * scaleX;
+        const canvasY = (e.clientY - rect.top) * scaleY;
+        const cx = Math.floor(canvasX / TILE);
+        const cy = Math.floor(canvasY / TILE);
+        return { cx: Math.max(0, Math.min(cx, mapW - 1)), cy: Math.max(0, Math.min(cy, mapH - 1)) };
+      }
+
+      canvas.addEventListener('mousemove', (e) => {
+        const { cx, cy } = getCellCoords(e);
+        const k7 = globalThis.k7;
+        const sid = k7 && typeof k7.mget === 'function' ? k7.mget(cx, cy) : 0;
+        if (hintEl) hintEl.textContent = 'Cell (' + cx + ',' + cy + ') — sprite ' + sid;
+      });
+      canvas.addEventListener('mouseleave', () => {
+        if (hintEl) hintEl.textContent = '256×32 cells, each 8×8 in game. Click/drag to paint.';
+      });
+
+      canvas.addEventListener('mousedown', (e) => {
+        const k7 = globalThis.k7;
+        if (!k7 || typeof k7.mset !== 'function') return;
+        const paintId = Math.max(0, Math.min(255, (spriteIdInput.valueAsNumber | 0)));
+        const { cx, cy } = getCellCoords(e);
+        k7.mset(cx, cy, paintId);
+        refreshMap();
+        const move = (e2) => {
+          const p = getCellCoords(e2);
+          k7.mset(p.cx, p.cy, paintId);
+          refreshMap();
+        };
+        window.addEventListener('mousemove', move);
+        window.addEventListener('mouseup', () => window.removeEventListener('mousemove', move), { once: true });
+      });
+
+      document.querySelector('.tabs button[data-tab="map"]')?.addEventListener('click', refreshMap);
+      refreshMap();
+    }
+
+    const FLASH_PALETTE = [0x000000,0x1d2b53,0x7e2553,0x008751,0xab5236,0x5f574f,0xc2c3c7,0xfff1e8,0xff004d,0xffa300,0xffec27,0x00e436,0x29adff,0x836e8b,0xff77a8,0xffccaa];
+    function applyFlashOverlay() {
+      if (window._flashFrames <= 0) return;
+      const canvas = document.getElementById('k7canvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      const c = window._flashColor != null ? (FLASH_PALETTE[window._flashColor] != null ? FLASH_PALETTE[window._flashColor] : 0xff004d) : 0xff004d;
+      const r = (c >> 16) & 0xff, g = (c >> 8) & 0xff, b = c & 0xff;
+      ctx.save();
+      ctx.globalAlpha = 0.35;
+      ctx.fillStyle = 'rgb(' + r + ',' + g + ',' + b + ')';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.restore();
+    }
+    const FIXED_DT_MS = 1000 / 60;
+    const MAX_CATCHUP_STEPS = 3;
+
+    function startLoop() {
+      gamePaused = false;
+      if (musicGain != null) musicGain.gain.value = musicGainWhenPaused;
+      window._k7Frame = 0;
+      let lastTime = null;
+      let fixedTimestepAccum = 0;
+      if (rafId != null) cancelAnimationFrame(rafId);
+      const pauseBtn = document.getElementById('pause-btn');
+      if (pauseBtn) { pauseBtn.disabled = false; pauseBtn.textContent = 'Pause'; pauseBtn.title = 'Pause game (P)'; }
+      function loop(now) {
+        const t0 = performance.now();
+        function beginGameTick() {
+          if (replayRecording) replayData.push(replaySnapshot());
+          if (replayPlaying && replayData.length > 0) {
+            if (replayFrameIndex >= replayData.length) {
+              replayPlaying = false;
+              window._replayInput = null;
+              window._replayPrevInput = null;
+              if (typeof updateReplayUI === 'function') updateReplayUI();
+            } else {
+              window._replayPrevInput = window._replayInput || { keys: 0, mx: 0, my: 0, mbtn: 0 };
+              window._replayInput = replayData[replayFrameIndex];
+              replayFrameIndex++;
+            }
+          } else if (!replayPlaying) {
+            window._replayInput = null;
+            window._replayPrevInput = null;
+          }
+        }
+        if (!gamePaused && globalThis.game_loop_js) {
+          if (lastTime == null) {
+            lastTime = now;
+            beginGameTick();
+            try {
+              globalThis.game_loop_js();
+            } catch (e) {
+              console.error(e);
+            }
+            window._k7Frame = (window._k7Frame || 0) + 1;
+            clearBtnp();
+          } else {
+            fixedTimestepAccum += now - lastTime;
+            lastTime = now;
+            let steps = 0;
+            while (fixedTimestepAccum >= FIXED_DT_MS && steps < MAX_CATCHUP_STEPS) {
+              beginGameTick();
+              try {
+                globalThis.game_loop_js();
+              } catch (e) {
+                console.error(e);
+              }
+              window._k7Frame = (window._k7Frame || 0) + 1;
+              fixedTimestepAccum -= FIXED_DT_MS;
+              steps++;
+              clearBtnp();
+            }
+          }
+        } else if (gamePaused) {
+          lastTime = null;
+          fixedTimestepAccum = 0;
+        }
+        if (gamePaused) applyPausedOverlay();
+        const frameMs = performance.now() - t0;
+        profilerFrameTimes.push(frameMs);
+        if (profilerFrameTimes.length > PROFILER_HISTORY) profilerFrameTimes.shift();
+        const overlay = document.getElementById('profiler-overlay');
+        if (overlay && overlay.style.display !== 'none') {
+          const n = profilerFrameTimes.length;
+          const avg = n ? profilerFrameTimes.reduce((a, b) => a + b, 0) / n : 0;
+          const peak = n ? Math.max(...profilerFrameTimes) : 0;
+          const fps = avg > 0 ? (1000 / avg) : 0;
+          overlay.textContent = (gamePaused ? 'PAUSED | ' : '') + 'FPS: ' + fps.toFixed(1) + ' | ' + avg.toFixed(2) + ' ms (peak ' + peak.toFixed(2) + ')';
+        }
+        if (window._flashFrames > 0) {
+          applyFlashOverlay();
+          window._flashFrames--;
+        }
+        if (replayRecording) {
+          const canvas = document.getElementById('k7canvas');
+          if (canvas && canvas.width > 0 && canvas.height > 0) {
+            try {
+              replayFrames.push(canvas.toDataURL('image/png'));
+              if (replayFrames.length > REPLAY_FRAMES_MAX) replayFrames.shift();
+              if (replayFrames.length <= 1 || replayFrames.length % 10 === 0) { if (typeof updateReplayUI === 'function') updateReplayUI(); }
+            } catch (e) { console.warn('Replay capture:', e); }
+          }
+        }
+        rafId = requestAnimationFrame(loop);
+      }
+      rafId = requestAnimationFrame(loop);
+    }
+    function applyPausedOverlay() {
+      const canvas = document.getElementById('k7canvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.save();
+      ctx.fillStyle = 'rgba(15,15,20,0.75)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#5dd9a8';
+      ctx.font = 'bold 24px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('PAUSED', canvas.width / 2, canvas.height / 2 - 8);
+      ctx.font = '12px "DM Sans", sans-serif';
+      ctx.fillStyle = '#9898a6';
+      ctx.fillText('P or click Pause to resume', canvas.width / 2, canvas.height / 2 + 16);
+      ctx.restore();
+    }
+    function togglePause() {
+      if (rafId == null) return;
+      gamePaused = !gamePaused;
+      if (musicGain != null) {
+        if (gamePaused) {
+          musicGainWhenPaused = musicGain.gain.value;
+          musicGain.gain.value = 0;
+        } else {
+          musicGain.gain.value = musicGainWhenPaused;
+        }
+      }
+      const pauseBtn = document.getElementById('pause-btn');
+      if (pauseBtn) {
+        pauseBtn.textContent = gamePaused ? 'Resume' : 'Pause';
+        pauseBtn.title = gamePaused ? 'Resume game (P)' : 'Pause game (P)';
+      }
+      status(gamePaused ? 'Paused' : 'Running');
+    }
+
+    async function runCode() {
+      const runBtn = document.getElementById('run');
+      const pyodide = window.pyodide;
+      if (!codeEditor || !pyodide) return;
+      runCodeInProgress = true;
+      runBtn.disabled = true;
+      status('Running…');
+      if (rafId != null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+      const pauseBtn = document.getElementById('pause-btn');
+      if (pauseBtn) { pauseBtn.disabled = true; pauseBtn.textContent = 'Pause'; }
+      try {
+        window._k7TextInputMode = false;
+        window._k7KeyQueue = [];
+        const k7 = globalThis.k7;
+        if (k7 && typeof k7.reset_game_state === 'function') {
+          k7.reset_game_state();
+        } else if (k7) {
+          if (typeof k7.reset_sprite_bank === 'function') k7.reset_sprite_bank();
+          if (typeof k7.reset_map === 'function') k7.reset_map();
+          if (typeof k7.switch_palette === 'function') k7.switch_palette('pico8');
+        }
+        await pyodide.runPythonAsync(getCode());
+        if (globalThis.game_loop_js) {
+          startLoop();
+          status('Running (Python game loop active)');
+        } else {
+          status('No game_loop in code — define game_loop() and set js.game_loop_js = game_loop');
+        }
+      } catch (e) {
+        status('Error: ' + (e?.message || String(e)));
+        console.error(e);
+      }
+      runBtn.disabled = false;
+      runCodeInProgress = false;
+    }
+
+    function initTabs() {
+      document.querySelectorAll('.tabs button').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('active'));
+          document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+          btn.classList.add('active');
+          const panel = document.getElementById('panel-' + btn.dataset.tab);
+          if (panel) panel.classList.add('active');
+        });
+      });
+    }
+
+    function getCode() {
+      if (codeEditor && codeEditor.getValue) return codeEditor.getValue();
+      const fallback = document.getElementById('code-fallback');
+      return fallback ? fallback.value : defaultGame;
+    }
+
+    function initCodeEditor() {
+      const el = document.getElementById('code-editor');
+      const runBtn = document.getElementById('run');
+      if (!el) return;
+      try {
+        if (window.ace) {
+          codeEditor = ace.edit(el);
+          codeEditor.setTheme('ace/theme/monokai');
+          codeEditor.session.setMode('ace/mode/python');
+          codeEditor.setOptions({ fontSize: '14px', showPrintMargin: false });
+          codeEditor.setValue(defaultGame, -1);
+        }
+      } catch (e) {
+        console.warn('Ace failed, using textarea', e);
+      }
+      if (!codeEditor) {
+        el.style.display = 'none';
+        const ta = document.createElement('textarea');
+        ta.id = 'code-fallback';
+        ta.spellcheck = false;
+        ta.style.cssText = 'width:100%;height:640px;background:#2a2a3e;color:#eee;border:1px solid #444;border-radius:4px;padding:10px;font-family:Consolas,Monaco,monospace;font-size:14px;';
+        ta.value = defaultGame;
+        el.parentNode.insertBefore(ta, el);
+      }
+      if (runBtn) runBtn.addEventListener('click', runCode);
+      const canvasOnlyBtn = document.getElementById('canvas-only-toggle');
+      if (canvasOnlyBtn) canvasOnlyBtn.addEventListener('click', () => {
+        document.body.classList.toggle('canvas-only');
+        canvasOnlyBtn.textContent = document.body.classList.contains('canvas-only') ? '▶' : '◀';
+        canvasOnlyBtn.title = document.body.classList.contains('canvas-only') ? 'Show editor panel' : 'Show only canvas';
+      });
+      window._llmChatInput = '';
+      const llmInput = document.getElementById('llm-chat-input');
+      const llmSend = document.getElementById('llm-chat-send');
+      function submitLlmChat() {
+        if (!llmInput) return;
+        const t = (llmInput.value || '').trim();
+        if (t) {
+          window._llmChatInput = t;
+          llmInput.value = '';
+        }
+      }
+      if (llmSend) llmSend.addEventListener('click', submitLlmChat);
+      if (llmInput) llmInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); submitLlmChat(); } });
+      document.getElementById('pause-btn')?.addEventListener('click', togglePause);
+      document.addEventListener('keydown', (e) => {
+        if (e.code !== 'KeyP') return;
+        const target = e.target;
+        if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
+        if (rafId == null) return;
+        e.preventDefault();
+        togglePause();
+      });
+      function scheduleHotReload() {
+        if (!document.getElementById('hot-reload')?.checked || runCodeInProgress) return;
+        if (hotReloadDebounceId) clearTimeout(hotReloadDebounceId);
+        hotReloadDebounceId = setTimeout(() => {
+          hotReloadDebounceId = null;
+          if (!document.getElementById('hot-reload')?.checked || runCodeInProgress) return;
+          runCode();
+        }, HOT_RELOAD_MS);
+      }
+      if (codeEditor && codeEditor.on) {
+        codeEditor.on('change', scheduleHotReload);
+      }
+      const codeFallback = document.getElementById('code-fallback');
+      if (codeFallback) codeFallback.addEventListener('input', scheduleHotReload);
+      const profilerToggle = document.getElementById('profiler-toggle');
+      const profilerOverlay = document.getElementById('profiler-overlay');
+      if (profilerToggle && profilerOverlay) {
+        profilerToggle.addEventListener('change', () => {
+          profilerOverlay.style.display = profilerToggle.checked ? 'block' : 'none';
+        });
+      }
+      const cheatSheetBtn = document.getElementById('cheat-sheet-btn');
+      const cheatSheetModal = document.getElementById('cheat-sheet-modal');
+      const cheatSheetClose = document.getElementById('cheat-sheet-close');
+      if (cheatSheetBtn && cheatSheetModal) cheatSheetBtn.addEventListener('click', () => { cheatSheetModal.style.display = 'block'; });
+      if (cheatSheetClose && cheatSheetModal) cheatSheetClose.addEventListener('click', () => { cheatSheetModal.style.display = 'none'; });
+      if (cheatSheetModal) cheatSheetModal.addEventListener('click', (e) => { if (e.target === cheatSheetModal) cheatSheetModal.style.display = 'none'; });
+      const exampleSelect = document.getElementById('example-select');
+      if (exampleSelect) {
+        function updateExampleUI(val) {
+          const mm = document.getElementById('multiplayer-matchmaking');
+          if (mm) mm.style.display = (val === 'multiplayer' || val === 'shared_drawing') ? 'block' : 'none';
+          const chatBar = document.getElementById('llm-chat-bar');
+          if (chatBar) chatBar.classList.toggle('visible', false);
+        }
+        exampleSelect.addEventListener('change', () => {
+          const val = exampleSelect.value;
+          loadExample(val);
+          updateExampleUI(val);
+        });
+        const mm = document.getElementById('multiplayer-matchmaking');
+        if (mm && (exampleSelect.value === 'multiplayer' || exampleSelect.value === 'shared_drawing')) mm.style.display = 'block';
+        const chatBar = document.getElementById('llm-chat-bar');
+        if (chatBar && exampleSelect.value === 'llm_demo') chatBar.classList.add('visible');
+      }
+      const loadDemoBtn = document.getElementById('load-demo-btn');
+      if (loadDemoBtn && exampleSelect) {
+        loadDemoBtn.addEventListener('click', () => {
+          exampleSelect.value = 'showcase';
+          loadExample('showcase');
+          const mm = document.getElementById('multiplayer-matchmaking');
+          if (mm) mm.style.display = 'none';
+        });
+      }
+      window._multiplayerAction = window._multiplayerAction || 'create';
+      const createBtn = document.getElementById('multiplayer-create');
+      const joinBtn = document.getElementById('multiplayer-join');
+      const joinInput = document.getElementById('multiplayer-join-code');
+      const roomDisplay = document.getElementById('multiplayer-room-display');
+      if (createBtn) createBtn.addEventListener('click', () => {
+        window._multiplayerAction = 'create';
+        if (roomDisplay) roomDisplay.textContent = 'Click Run to create room';
+      });
+      if (joinBtn && joinInput) joinBtn.addEventListener('click', () => {
+        const code = (joinInput.value || '').trim().toUpperCase();
+        if (code.length >= 4) {
+          window._multiplayerAction = 'join:' + code;
+          if (roomDisplay) roomDisplay.textContent = 'Click Run to join';
+        }
+      });
+      // Room link: copy URL with ?room=CODE for sharing. On load, ?room=CODE pre-fills join.
+      const roomLinkBtn = document.getElementById('multiplayer-room-link');
+      if (roomLinkBtn && roomDisplay) {
+        roomLinkBtn.style.display = 'none';
+        const showRoomLink = (code) => {
+          if (!code) return;
+          roomLinkBtn.style.display = 'inline-block';
+          roomLinkBtn.textContent = 'Copy room link';
+          roomLinkBtn.onclick = () => {
+            const url = new URL(location.href);
+            url.searchParams.set('room', code);
+            navigator.clipboard.writeText(url.toString()).then(() => { roomLinkBtn.textContent = 'Copied!'; setTimeout(() => { roomLinkBtn.textContent = 'Copy room link'; }, 1500); });
+          };
+        };
+        const observer = new MutationObserver(() => {
+          const t = roomDisplay.textContent || '';
+          const m = t.match(/Room:\s*([A-Z0-9]+)/);
+          if (m) showRoomLink(m[1]);
+          else if (t === 'Joined') {
+            const code = (joinInput && joinInput.value) ? joinInput.value.trim().toUpperCase() : '';
+            if (code) showRoomLink(code);
+          }
+        });
+        observer.observe(roomDisplay, { childList: true, characterData: true, subtree: true });
+      }
+      const urlRoom = new URLSearchParams(location.search).get('room');
+      if (urlRoom && joinInput) {
+        joinInput.value = urlRoom.toUpperCase();
+        if (urlRoom.length >= 4) {
+          window._multiplayerAction = 'join:' + urlRoom.toUpperCase();
+          if (roomDisplay) roomDisplay.textContent = 'Open link with room code — click Join then Run';
+        }
+      }
+    }
+
+    function updateReplayUI() {
+      const recordBtn = document.getElementById('replay-record');
+      const stopBtn = document.getElementById('replay-stop');
+      const playBtn = document.getElementById('replay-play');
+      const statusEl = document.getElementById('replay-status');
+      if (recordBtn) recordBtn.style.display = replayRecording ? 'none' : 'inline-block';
+      if (stopBtn) stopBtn.style.display = replayRecording ? 'inline-block' : 'none';
+      if (playBtn) playBtn.disabled = replayData.length === 0 || replayPlaying;
+      if (statusEl) {
+        if (replayRecording) statusEl.textContent = 'Recording… ' + replayFrames.length + ' frames';
+        else if (replayPlaying) statusEl.textContent = 'Playing…';
+        else if (replayFrames.length > 0 || replayData.length > 0) statusEl.textContent = replayFrames.length + ' frames (Export GIF)';
+        else statusEl.textContent = '';
+      }
+    }
+
+    function initReplay() {
+      const recordBtn = document.getElementById('replay-record');
+      const stopBtn = document.getElementById('replay-stop');
+      const playBtn = document.getElementById('replay-play');
+      const importBtn = document.getElementById('replay-import');
+      const fileInput = document.getElementById('replay-file');
+      if (recordBtn) recordBtn.addEventListener('click', () => {
+        replayRecording = true;
+        replayPlaying = false;
+        replayData = [];
+        replayFrames = [];
+        replayFrameIndex = 0;
+        updateReplayUI();
+        status('Recording (video + input)…');
+      });
+      if (stopBtn) stopBtn.addEventListener('click', () => {
+        replayRecording = false;
+        updateReplayUI();
+        status('Stopped: ' + replayData.length + ' input frames, ' + replayFrames.length + ' video frames');
+      });
+      if (playBtn) playBtn.addEventListener('click', () => {
+        if (replayData.length === 0) return;
+        replayPlaying = true;
+        replayRecording = false;
+        replayFrameIndex = 0;
+        window._k7Frame = 0;
+        updateReplayUI();
+        status('Playing replay…');
+      });
+      const exportGifBtn = document.getElementById('replay-export-gif');
+      function runGifExport() {
+        if (replayFrames.length === 0) { status('No video to export — Record first'); return; }
+        const gifshotLib = (typeof window !== 'undefined' && window.gifshot) || null;
+        if (!gifshotLib) {
+          status('Loading GIF library…');
+          const s = document.createElement('script');
+          s.src = 'deps/gifshot.min.js';
+          s.onload = () => {
+            if (window.gifshot) runGifExport();
+            else status('GIF library failed to load');
+          };
+          s.onerror = () => status('GIF library failed to load (network?)');
+          document.head.appendChild(s);
+          return;
+        }
+        status('Encoding GIF…');
+        const interval = 1 / 20;
+        gifshotLib.createGIF({
+          images: replayFrames,
+          gifWidth: 256,
+          gifHeight: 256,
+          interval: interval,
+          sampleInterval: 1,
+          numWorkers: 2
+        }, (obj) => {
+          if (obj && obj.error) { status('GIF failed: ' + (obj.errorMsg || obj.errorCode || 'error')); return; }
+          if (!obj || !obj.image) { status('GIF failed'); return; }
+          const a = document.createElement('a');
+          a.href = obj.image;
+          a.download = 'k7-recording.gif';
+          a.click();
+          status('GIF exported');
+        });
+      }
+      if (exportGifBtn) exportGifBtn.addEventListener('click', runGifExport);
+      if (importBtn && fileInput) importBtn.addEventListener('click', () => fileInput.click());
+      if (fileInput) fileInput.addEventListener('change', (e) => {
+        const f = e.target.files[0];
+        if (!f) return;
+        const r = new FileReader();
+        r.onload = () => {
+          try {
+            const o = JSON.parse(r.result);
+            replayData = o.frames || [];
+            replayPlaying = false;
+            replayRecording = false;
+            replayFrameIndex = 0;
+            updateReplayUI();
+            status('Replay loaded: ' + replayData.length + ' frames');
+          } catch (err) {
+            status('Invalid replay file');
+          }
+        };
+        r.readAsText(f);
+        fileInput.value = '';
+      });
+      updateReplayUI();
+    }
+
+    function initGraphicsEditor() {
+      const canvas = document.getElementById('pixel-editor');
+      const paletteEl = document.getElementById('palette');
+      const paletteSelect = document.getElementById('palette-select');
+      if (paletteSelect && globalThis.k7 && typeof globalThis.k7.palette_list === 'function') {
+        const list = globalThis.k7.palette_list();
+        for (let i = 0; i < list.length; i++) {
+          const o = document.createElement('option');
+          o.value = list[i];
+          o.textContent = list[i];
+          paletteSelect.appendChild(o);
+        }
+        paletteSelect.addEventListener('change', () => {
+          if (globalThis.k7 && typeof globalThis.k7.switch_palette === 'function') globalThis.k7.switch_palette(paletteSelect.value);
+        });
+      }
+      if (!canvas || !paletteEl) return;
+      const ctx = canvas.getContext('2d');
+      const w = 128, h = 128;
+      let selectedIndex = 7;
+      const imageData = ctx.createImageData(w, h);
+      for (let i = 0; i < w * h * 4; i += 4) {
+        imageData.data[i] = imageData.data[i + 1] = imageData.data[i + 2] = 0;
+        imageData.data[i + 3] = 255;
+      }
+      ctx.putImageData(imageData, 0, 0);
+
+      PALETTE.forEach((rgba, i) => {
+        const span = document.createElement('span');
+        span.style.backgroundColor = `rgb(${rgba[0]},${rgba[1]},${rgba[2]})`;
+        span.title = 'Color ' + i;
+        if (i === selectedIndex) span.classList.add('selected');
+        span.addEventListener('click', () => {
+          paletteEl.querySelectorAll('span').forEach(s => s.classList.remove('selected'));
+          span.classList.add('selected');
+          selectedIndex = i;
+        });
+        paletteEl.appendChild(span);
+      });
+
+      function getPixelCoords(e) {
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        const x = Math.floor((e.clientX - rect.left) * scaleX);
+        const y = Math.floor((e.clientY - rect.top) * scaleY);
+        return { x: Math.max(0, Math.min(x, w - 1)), y: Math.max(0, Math.min(y, h - 1)) };
+      }
+
+      function drawPixel(x, y) {
+        const data = ctx.getImageData(0, 0, w, h);
+        const idx = (y * w + x) * 4;
+        const c = PALETTE[selectedIndex];
+        data.data[idx] = c[0];
+        data.data[idx + 1] = c[1];
+        data.data[idx + 2] = c[2];
+        data.data[idx + 3] = 255;
+        ctx.putImageData(data, 0, 0);
+      }
+
+      canvas.addEventListener('mousedown', e => {
+        const { x, y } = getPixelCoords(e);
+        drawPixel(x, y);
+        let move = (e2) => {
+          const p = getPixelCoords(e2);
+          drawPixel(p.x, p.y);
+        };
+        window.addEventListener('mousemove', move);
+        window.addEventListener('mouseup', () => {
+          window.removeEventListener('mousemove', move);
+        }, { once: true });
+      });
+
+      document.getElementById('copy-to-k7').addEventListener('click', () => {
+        const k7 = globalThis.k7;
+        if (!k7) { status('K7 not ready'); return; }
+        const data = ctx.getImageData(0, 0, w, h);
+        const buf = new Uint8Array(data.data);
+        try {
+          k7.copy_from_u8(0, 0, w, h, buf);
+          status('Graphics copied to K7 screen (top-left 128×128)');
+        } catch (err) {
+          status('Error: ' + (err?.message || String(err)));
+        }
+      });
+
+      document.getElementById('clear-gfx').addEventListener('click', () => {
+        const data = ctx.getImageData(0, 0, w, h);
+        data.data.fill(0);
+        for (let i = 3; i < data.data.length; i += 4) data.data[i] = 255;
+        ctx.putImageData(data, 0, 0);
+      });
+    }
+
+    function initSoundsEditor() {
+      const el = document.getElementById('sounds-editor');
+      if (el) el.value = defaultSounds;
+    }
+
+    function isPlayerMode() {
+      const params = new URLSearchParams(location.search);
+      return params.get('player') === '1';
+    }
+
+    async function main() {
+      const playerMode = isPlayerMode();
+      if (playerMode) document.body.classList.add('player-mode');
+      try {
+        if (!playerMode) initTabs();
+        status('Loading Pyodide…');
+        const pyodide = await loadPyodide({ indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.24.1/full/' });
+        window.pyodide = pyodide;
+        status('Loading K7 WASM…');
+        await init();
+        const k7 = new K7Web();
+        const origSpr = k7.spr.bind(k7);
+        k7.spr = function(n, x, y, w, h, flip_x, flip_y, scale) {
+          return origSpr(n, x, y, w, h, flip_x, flip_y, (scale !== undefined && scale >= 1) ? scale : 1);
+        };
+        globalThis.k7 = k7;
+        window._k7Frame = 0;
+        k7.frame = function() { return window._k7Frame || 0; };
+        window.__K7_LOGO_SPRITE = null;
+        (function preloadLogo() {
+          const PICO8 = [[0,0,0],[29,43,83],[126,37,83],[0,135,81],[171,82,54],[95,87,79],[194,195,199],[255,241,232],[255,0,77],[255,163,0],[255,240,36],[0,231,86],[41,173,255],[131,118,156],[255,119,168],[255,204,170]];
+          function nearest(r,g,b) {
+            let best=0, bestD=1e9;
+            for (let i=0;i<16;i++) {
+              const d=(r-PICO8[i][0])**2+(g-PICO8[i][1])**2+(b-PICO8[i][2])**2;
+              if (d<bestD) { bestD=d; best=i; }
+            }
+            return best;
+          }
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          img.onload = function() {
+            const LOGOW=24, LOGOH=8, pw=LOGOW*8, ph=LOGOH*8;
+            const c = document.createElement('canvas');
+            c.width = pw; c.height = ph;
+            const ctx = c.getContext('2d');
+            ctx.drawImage(img, 0, 0, pw, ph);
+            const id = ctx.getImageData(0, 0, pw, ph);
+            const sheet = new Uint8Array(256*64);
+            for (let cy=0;cy<LOGOH;cy++)
+              for (let cx=0;cx<LOGOW;cx++) {
+                const n = cy*LOGOW + cx;
+                const sidx = n + 1;
+                const sheetX0 = (sidx % 32) * 8;
+                const sheetY0 = (sidx / 32 | 0) * 8;
+                for (let dy=0;dy<8;dy++)
+                  for (let dx=0;dx<8;dx++) {
+                    const i = ((cy*8+dy)*pw + (cx*8+dx))*4;
+                    const col = nearest(id.data[i], id.data[i+1], id.data[i+2]);
+                    const sx = sheetX0 + dx, sy = sheetY0 + dy;
+                    sheet[sy*256 + sx] = col;
+                  }
+              }
+            window.__K7_LOGO_SPRITE = sheet;
+          };
+          img.onerror = function() { console.warn('Logo preload failed'); };
+          img.src = 'logo.png';
+        })();
+        k7.apply_logo_from_preload = function() {
+          if (!window.__K7_LOGO_SPRITE) return false;
+          try {
+            k7.set_sprite_sheet(window.__K7_LOGO_SPRITE);
+            return true;
+          } catch (e) { console.warn(e); return false; }
+        };
+        setupInput(k7);
+        setupSound(k7);
+        setupLLM(k7);
+        k7.cls(0);
+        k7.print("Loading…", 80, 120, 7);
+        k7.draw_to_canvas('k7canvas');
+        if (!playerMode) {
+          initCodeEditor();
+          initGraphicsEditor();
+          initSoundEditor();
+          initSfxChainEditor();
+          initSpriteEditor();
+          initMapEditor();
+          initReplay();
+        }
+        const params = new URLSearchParams(location.search);
+        const demoMode = params.get('demo') === '1';
+        const urlState = await getStateFromUrl();
+        if (playerMode && !urlState && !demoMode) {
+          location.replace('index.html');
+          return;
+        }
+        if (urlState) {
+          applyState(urlState);
+          if (playerMode) {
+            await pyodide.runPythonAsync(urlState.code || '');
+            if (globalThis.game_loop_js) startLoop();
+          } else {
+            status('Game restored from URL. Click Run to play.');
+          }
+        } else if (playerMode && demoMode) {
+          const showcaseUrl = EXAMPLE_PATHS.showcase + '?t=' + Date.now();
+          const demoCode = await fetch(showcaseUrl, { cache: 'no-store' }).then(r => r.ok ? r.text() : Promise.reject()).catch(() => defaultGame);
+          await pyodide.runPythonAsync(demoCode);
+          if (globalThis.game_loop_js) startLoop();
+        } else if (!urlState) {
+          status('Running Python game…');
+          await pyodide.runPythonAsync(defaultGame);
+          if (globalThis.game_loop_js) {
+            startLoop();
+            status('Running (Python game loop active)');
+          }
+        }
+        const runBtn = document.getElementById('run');
+        if (runBtn) runBtn.disabled = false;
+      } catch (e) {
+        status('Error: ' + (e?.message || String(e)));
+        console.error(e);
+      }
+    }
+
+    function base64ToUint8Array(b64) {
+      const bin = atob(b64);
+      const arr = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+      return arr;
+    }
+    function uint8ArrayToBase64(arr) {
+      let bin = '';
+      const chunk = 8192;
+      for (let i = 0; i < arr.length; i += chunk) {
+        bin += String.fromCharCode.apply(null, arr.slice(i, i + chunk));
+      }
+      return btoa(bin);
+    }
+    async function compressStateJson(jsonStr) {
+      if (typeof CompressionStream === 'undefined') return null;
+      try {
+        const bytes = new TextEncoder().encode(jsonStr);
+        const stream = new Blob([bytes]).stream().pipeThrough(new CompressionStream('deflate'));
+        const buf = await new Response(stream).arrayBuffer();
+        return new Uint8Array(buf);
+      } catch (e) { return null; }
+    }
+    async function decompressState(compressedBytes) {
+      if (typeof DecompressionStream === 'undefined') return null;
+      try {
+        const stream = new Blob([compressedBytes]).stream().pipeThrough(new DecompressionStream('deflate'));
+        const buf = await new Response(stream).arrayBuffer();
+        return new TextDecoder().decode(buf);
+      } catch (e) { return null; }
+    }
+    async function getStateFromUrl() {
+      const params = new URLSearchParams(location.search);
+      let encoded = params.get('g');
+      if (!encoded && location.hash.slice(1).startsWith('g=')) {
+        encoded = decodeURIComponent(location.hash.slice(2));
+      }
+      if (!encoded) return null;
+      try {
+        if (encoded.charAt(0) === 'z') {
+          const compressed = base64ToUint8Array(encoded.slice(1));
+          const json = await decompressState(compressed);
+          if (json) return JSON.parse(json);
+          return null;
+        }
+        const json = decodeURIComponent(escape(atob(encoded)));
+        return JSON.parse(json);
+      } catch (e) {
+        return null;
+      }
+    }
+    function applyState(state) {
+      if (!state) return;
+      if (state.code != null && codeEditor && codeEditor.setValue) {
+        codeEditor.setValue(state.code, -1);
+      } else if (state.code != null) {
+        const fb = document.getElementById('code-fallback');
+        if (fb) fb.value = state.code;
+      }
+      const k7 = globalThis.k7;
+      if (state.sounds && Array.isArray(state.sounds) && k7) {
+        for (let i = 0; i < Math.min(SOUND_SLOTS, state.sounds.length); i++) {
+          soundBank[i] = state.sounds[i] != null ? String(state.sounds[i]) : '';
+          if (typeof k7.set_sound === 'function') k7.set_sound(i, soundBank[i]);
+          const input = document.getElementById('sound-input-' + i);
+          if (input) input.value = soundBank[i];
+          const row = document.querySelector('.sound-slot-row[data-slot="' + i + '"]');
+          if (row) {
+            const p = row.querySelector('.sound-slot-preview');
+            if (p) { p.textContent = (soundBank[i] || '—').slice(0, 24); p.title = soundBank[i] || '—'; }
+          }
+        }
+        if (typeof refreshPatternStrip === 'function') refreshPatternStrip();
+      }
+      if (state.chains && Array.isArray(state.chains) && sfxChains) {
+        for (let i = 0; i < Math.min(SFX_CHAIN_COUNT, state.chains.length); i++) {
+          if (Array.isArray(state.chains[i])) {
+            sfxChains[i] = state.chains[i].map(s => ({ slot: Number(s.slot)|0, delay: Number(s.delay)|0 }));
+          }
+        }
+        const chainSelect = document.getElementById('sfx-chain-select');
+        if (chainSelect) chainSelect.dispatchEvent(new Event('change'));
+      }
+      if (state.map && typeof state.map === 'string' && k7 && typeof k7.set_map === 'function') {
+        try {
+          const buf = base64ToUint8Array(state.map);
+          k7.set_map(buf);
+          if (typeof refreshMap === 'function') refreshMap();
+        } catch (e) { console.warn('Restore map:', e); }
+      }
+      if (state.sprites && typeof state.sprites === 'string' && k7 && typeof k7.set_sprite_sheet === 'function') {
+        try {
+          const buf = base64ToUint8Array(state.sprites);
+          k7.set_sprite_sheet(buf);
+          if (typeof refreshMap === 'function') refreshMap();
+          const strip = document.getElementById('sprite-picker-strip');
+          if (strip && strip._refresh) strip._refresh();
+        } catch (e) { console.warn('Restore sprites:', e); }
+      }
+    }
+    async function buildShareUrl() {
+      const k7 = globalThis.k7;
+      const code = (typeof getCode === 'function') ? getCode() : (document.getElementById('code-fallback')?.value || '');
+      const state = {
+        code,
+        sounds: soundBank ? soundBank.slice() : [],
+        chains: sfxChains ? sfxChains.map(c => c.map(s => ({ slot: s.slot, delay: s.delay }))) : []
+      };
+      if (k7 && typeof k7.get_map === 'function') {
+        const mapCells = k7.get_map();
+        const mapFlags = (typeof k7.get_map_flags === 'function') ? k7.get_map_flags() : new Uint8Array(mapCells.length);
+        state.map = uint8ArrayToBase64(new Uint8Array([...mapCells, ...mapFlags]));
+      }
+      if (k7 && typeof k7.get_sprite_sheet === 'function') {
+        const sprites = k7.get_sprite_sheet();
+        state.sprites = uint8ArrayToBase64(sprites);
+      }
+      const json = JSON.stringify(state);
+      let encoded;
+      const compressed = await compressStateJson(json);
+      if (compressed && compressed.length < json.length) {
+        encoded = 'z' + uint8ArrayToBase64(compressed);
+      } else {
+        encoded = btoa(unescape(encodeURIComponent(json)));
+      }
+      const url = location.origin + location.pathname + '?g=' + encodeURIComponent(encoded);
+      location.search = 'g=' + encodeURIComponent(encoded);
+      try {
+        navigator.clipboard.writeText(url);
+        status('URL updated and copied to clipboard. Share this link to open the full game elsewhere.');
+      } catch (e) {
+        status('URL updated. Copy the address bar to share.');
+      }
+    }
+    document.getElementById('share-game-btn')?.addEventListener('click', () => buildShareUrl());
+
+    main();
+  </script>
+</body>
+</html>

@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f0f14" />
+  <title>K7 — Play</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #0f0f14;
+      color: #e8e8ed;
+      font-family: system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      padding-left: max(1rem, env(safe-area-inset-left));
+      padding-right: max(1rem, env(safe-area-inset-right));
+    }
+    .message {
+      text-align: center;
+      max-width: 360px;
+    }
+    .message h1 { font-size: 1.25rem; margin: 0 0 0.5rem 0; color: #5dd9a8; }
+    .message p { margin: 0 0 1rem 0; color: #9898a6; font-size: 0.95rem; line-height: 1.5; }
+    .message a {
+      display: inline-block;
+      padding: 10px 20px;
+      background: rgba(93, 217, 168, 0.25);
+      color: #5dd9a8;
+      border: 1px solid #5dd9a8;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 500;
+      transition: background 0.15s;
+    }
+    .message a:hover { background: rgba(93, 217, 168, 0.35); }
+  </style>
+</head>
+<body>
+  <div class="message" id="message">
+    <h1>K7</h1>
+    <p id="text">No game in URL. Create and share a game from the editor, or try the demo.</p>
+    <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:0.5rem;">
+      <a id="demo-link" href="editor.html?demo=1&player=1" class="btn-demo">Load demo</a>
+      <a id="link" href="editor.html">Open editor</a>
+    </div>
+  </div>
+  <style>
+    .btn-demo { display:inline-block; padding:10px 20px; background:#5dd9a8; color:#0f0f14; border-radius:8px; text-decoration:none; font-weight:600; transition:background 0.15s; }
+    .btn-demo:hover { background:#6ee5b4; }
+  </style>
+  <script>
+    (function() {
+      const params = new URLSearchParams(location.search);
+      const g = params.get('g');
+      if (g) {
+        location.replace('editor.html?g=' + encodeURIComponent(g) + '&player=1');
+        return;
+      }
+    })();
+  </script>
+</body>
+</html>
