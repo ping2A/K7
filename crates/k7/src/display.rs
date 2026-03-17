@@ -202,6 +202,11 @@ impl Screen {
     }
 
     /// Draw a rectangle (filled) with 8-bit color.
+    /// Filled rectangle with RGBA (0..255). Use for 32-bit color drawing.
+    pub fn rectfill_rgba(&mut self, x0: i32, y0: i32, x1: i32, y1: i32, r: u8, g: u8, b: u8, a: u8) {
+        self.fill_rect_rgba(x0, y0, x1, y1, r, g, b, a);
+    }
+
     pub fn rectfill(&mut self, x0: i32, y0: i32, x1: i32, y1: i32, col: i32) {
         let (x0, x1) = (x0.min(x1), x0.max(x1));
         let (y0, y1) = (y0.min(y1), y0.max(y1));

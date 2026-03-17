@@ -142,6 +142,12 @@ impl K7Web {
         self.screen.rectfill(x0, y0, x1, y1, col);
     }
 
+    /// GFX: filled rectangle with RGBA (0..255).
+    #[wasm_bindgen]
+    pub fn rectfill_rgba(&mut self, x0: i32, y0: i32, x1: i32, y1: i32, r: i32, g: i32, b: i32, a: i32) {
+        self.screen.rectfill_rgba(x0, y0, x1, y1, r as u8, g as u8, b as u8, a as u8);
+    }
+
     /// GFX: rectangle outline.
     #[wasm_bindgen]
     pub fn rect(&mut self, x0: i32, y0: i32, x1: i32, y1: i32, col: i32) {
