@@ -6,10 +6,24 @@ use std::str;
 use wasmtime::*;
 use k7::{Screen, AudioEngine};
 
+/// Mouse state for WASM games (screen-space 0..width, 0..height).
+pub struct MouseState {
+    pub x: i32,
+    pub y: i32,
+    pub left: bool,
+}
+
+impl Default for MouseState {
+    fn default() -> Self {
+        Self { x: 0, y: 0, left: false }
+    }
+}
+
 pub struct WasmContext {
     pub screen: Arc<Mutex<Screen>>,
     pub audio: Arc<Mutex<AudioEngine>>,
     pub ws_inbox: Arc<Mutex<Vec<String>>>,
+    pub mouse: Arc<Mutex<MouseState>>,
 }
 
 pub struct WasmHost {
@@ -17,6 +31,7 @@ pub struct WasmHost {
     screen: Arc<Mutex<Screen>>,
     audio: Arc<Mutex<AudioEngine>>,
     ws_inbox: Arc<Mutex<Vec<String>>>,
+    mouse: Arc<Mutex<MouseState>>,
     store: Option<Store<WasmContext>>,
     init_fn: Option<TypedFunc<(), ()>>,
     update_fn: Option<TypedFunc<(), ()>>,
@@ -28,12 +43,14 @@ impl WasmHost {
         screen: Arc<Mutex<Screen>>,
         audio: Arc<Mutex<AudioEngine>>,
         ws_inbox: Arc<Mutex<Vec<String>>>,
+        mouse: Arc<Mutex<MouseState>>,
     ) -> Self {
         Self {
             engine: Engine::default(),
             screen,
             audio,
             ws_inbox,
+            mouse,
             store: None,
             init_fn: None,
             update_fn: None,
@@ -60,6 +77,9 @@ impl WasmHost {
         linker.func_wrap("env", "rectfill", |caller: Caller<'_, WasmContext>, x0: i32, y0: i32, x1: i32, y1: i32, col: i32| {
             caller.data().screen.lock().unwrap().rectfill(x0, y0, x1, y1, col);
         })?;
+        linker.func_wrap("env", "rectfill_rgba", |caller: Caller<'_, WasmContext>, x0: i32, y0: i32, x1: i32, y1: i32, r: i32, g: i32, b: i32, a: i32| {
+            caller.data().screen.lock().unwrap().rectfill_rgba(x0, y0, x1, y1, r as u8, g as u8, b as u8, a as u8);
+        })?;
         linker.func_wrap("env", "spr", |caller: Caller<'_, WasmContext>, n: u32, x: i32, y: i32, w: i32, h: i32, flip_x: i32, flip_y: i32| {
             caller.data().screen.lock().unwrap().spr(n, x, y, w, h, flip_x != 0, flip_y != 0, 1);
         })?;
@@ -79,6 +99,15 @@ impl WasmHost {
         })?;
         linker.func_wrap("env", "frnd", |_caller: Caller<'_, WasmContext>| -> f32 {
             rand::random()
+        })?;
+        linker.func_wrap("env", "mouse_x", |caller: Caller<'_, WasmContext>| -> i32 {
+            caller.data().mouse.lock().map(|m| m.x).unwrap_or(0)
+        })?;
+        linker.func_wrap("env", "mouse_y", |caller: Caller<'_, WasmContext>| -> i32 {
+            caller.data().mouse.lock().map(|m| m.y).unwrap_or(0)
+        })?;
+        linker.func_wrap("env", "mouse_left_state", |caller: Caller<'_, WasmContext>, _button: i32| -> i32 {
+            caller.data().mouse.lock().map(|m| m.left as i32).unwrap_or(0)
         })?;
         linker.func_wrap("env", "play_sound", |caller: Caller<'_, WasmContext>, channel: u32, sound_id: u32| {
             let _ = caller.data().audio.lock().map(|mut a| a.play_sound(channel as u8, sound_id as u8));
@@ -171,6 +200,7 @@ impl WasmHost {
             screen: self.screen.clone(),
             audio: self.audio.clone(),
             ws_inbox: self.ws_inbox.clone(),
+            mouse: self.mouse.clone(),
         }));
         let mut linker = Linker::new(&self.engine);
         Self::bind_api(&mut linker)?;

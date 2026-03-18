@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "2021"
 description = "K7 native runtime: pixels + winit + wasmtime"
 
+[lib]
+name = "k7_native"
+path = "src/lib.rs"
+
 [[bin]]
 name = "k7"
 path = "src/main.rs"

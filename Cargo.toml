@@ -4,8 +4,10 @@ members = [
     "crates/k7",
     "crates/k7-native",
     "crates/k7-web",
-    "crates/k7-game-example",
     "crates/k7-multiplayer-server",
+    "examples/k7-game-example",
+    "examples/k7-sable",
+    "examples/k7-sable-native",
 ]
 
 # Required for wasm32 no_std (game-example): unwinding not supported without std
