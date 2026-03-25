@@ -448,12 +448,20 @@
     .page-header { text-align: center; margin-bottom: var(--space-lg); }
     .page-header .logo { display: block; max-width: 100%; width: 280px; height: auto; margin: 0 auto; image-rendering: pixelated; image-rendering: crisp-edges; }
     .page-header .tagline { margin: var(--space) 0 0 0; font-size: 0.95rem; color: var(--text-muted); font-weight: 500; }
+    .page-header .repo-link { margin: 6px 0 0 0; font-size: 0.85rem; }
+    .page-header .repo-link a { color: var(--accent); text-decoration: none; }
+    .page-header .repo-link a:hover { text-decoration: underline; }
     body.player-mode .page-header { display: none; }
+    body.player-mode .editor-side { display: none !important; }
     body.player-mode .panels { display: none; }
     body.player-mode .output-toolbar { display: none; }
     body.player-mode #status { display: none; }
     body.player-mode .input-hint { display: none; }
     body.player-mode .llm-chat-bar { display: none !important; }
+    /* Demo / play URL: canvas was stuck right because empty editor-side still took 70% flex. */
+    body.player-mode .editor-layout { flex: 1; width: 100%; min-height: 0; justify-content: center; }
+    body.player-mode .layout-main { flex: 1; min-height: 0; justify-content: center; align-items: center; }
+    body.player-mode .output-side { flex: 0 1 auto; min-width: 0; max-width: 100%; justify-content: center; }
 
     /* Player / demo: size + fullscreen (main page & shared play URLs) */
     .player-embed-controls {
@@ -581,6 +589,7 @@
   <header class="page-header">
     <img src="logo.png" alt="K7" class="logo" width="280" height="auto" />
     <p class="tagline">K7 + Python (Pyodide)</p>
+    <p class="repo-link"><a href="https://github.com/ping2a/k7" target="_blank" rel="noopener noreferrer">github.com/ping2a/k7</a></p>
   </header>
   <div class="editor-layout">
     <div class="layout-top-bar">
