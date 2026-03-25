@@ -1,0 +1,17 @@
+[package]
+name = "k7-sable"
+version = "0.1.0"
+edition = "2021"
+description = "Sable falling-sand game for K7 native (Rust port of PikuseruConsole/Sable)"
+
+[lib]
+crate-type = ["cdylib"]
+
+[profile.release]
+lto = true
+opt-level = "z"
+codegen-units = 1
+panic = "abort"
+
+[dependencies]
+libm = "0.2"

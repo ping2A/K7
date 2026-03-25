@@ -1,0 +1,18 @@
+[package]
+name = "k7-sable-native"
+version = "0.1.0"
+edition = "2021"
+description = "Sable falling-sand game in pure Rust using k7 (no WASM)"
+
+[[bin]]
+name = "k7-sable-native"
+path = "src/main.rs"
+
+[dependencies]
+k7 = { path = "../../crates/k7" }
+k7-native = { path = "../../crates/k7-native" }
+rand = "0.8"
+libm = "0.2"
+anyhow = "1.0"
+log = "0.4"
+env_logger = "0.11"

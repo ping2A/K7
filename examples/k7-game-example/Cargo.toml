@@ -1,0 +1,17 @@
+[package]
+name = "k7-game-example"
+version = "0.1.0"
+edition = "2021"
+description = "Simple test game for K7 (bouncing ball + title)"
+
+[lib]
+crate-type = ["cdylib"]
+
+[profile.release]
+lto = true
+opt-level = "z"
+codegen-units = 1
+panic = "abort"
+
+[dependencies]
+libm = "0.2"

@@ -1,0 +1,12 @@
+{
+  "name": "k7-multiplayer-server",
+  "version": "0.1.0",
+  "description": "Simple WebSocket server for K7 multiplayer (broadcast)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.14.0"
+  }
+}
