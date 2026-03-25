@@ -7,8 +7,21 @@ CANVAS_ID = "k7canvas"
 W, H = 256, 256
 sprites = []
 
+def paint_demo_sprites():
+    # Palette index 0 is transparent for spr(); draw visible pixels so demo works on a blank sheet.
+    for n in range(12):
+        base_x = (n % 32) * 8
+        base_y = (n // 32) * 8
+        col = (n % 15) + 1
+        for y in range(8):
+            for x in range(8):
+                if (x - 3.5) ** 2 + (y - 3.5) ** 2 < 12:
+                    k7.sset(base_x + x, base_y + y, col)
+
+
 def init():
     global sprites
+    paint_demo_sprites()
     sprites = []
     for i in range(12):
         sprites.append({

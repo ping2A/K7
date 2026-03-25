@@ -32,23 +32,25 @@ def update():
         k7.sfx(1)
 
 def draw():
-    global A
+    global A, t
     k7.cls(0)
-    a2 = A * 2
-    step = 4
+    a2 = A * 6.283 * 0.5
+    step = 2
+    drift = t * 0.018
     for x in range(0, SIZE, step):
-        x2 = x / 2048.0
+        xf = x * 0.045 + drift
         for y in range(0, SIZE, step):
-            y2 = y / 1024.0
-            v1 = 256 + 192 * math.sin(y2 + a2)
-            v2 = math.sin(A - x2 + y2)
-            r = 56 * math.cos(a2 + x / v1 + v2)
-            g = 48 * math.sin((x + y) / v1 * v2)
-            b = 40 * math.cos((x * v2 - y) / v1)
-            val = (56 + r) + (48 - g) + (40 + b) + (24 - r + g)
-            c = int(abs(val * 0.1) % 16)
+            yf = y * 0.045 + drift * 0.73
+            s1 = math.sin(yf * 1.7 + a2)
+            s2 = math.sin(xf * 1.3 - yf * 1.1 + A * 4.2)
+            s3 = math.cos((xf + yf) * 0.85 + a2 * 0.5)
+            s4 = math.sin(math.hypot(x - 128, y - 128) * 0.06 - t * 0.12)
+            w = s1 * 5.5 + s2 * 4.0 + s3 * 3.0 + s4 * 2.5
+            c = int((w * 1.15 + 8) % 16)
             if c == 0:
-                c = 8
+                c = 13
+            elif c == 1:
+                c = 12
             k7.rectfill(x, y, min(x + step - 1, SIZE - 1), min(y + step - 1, SIZE - 1), c)
     k7.rectfill(0, 0, SIZE - 1, 18, 0)
     k7.print("PLASMA", 100, 4, 11)

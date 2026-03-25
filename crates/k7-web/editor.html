@@ -453,6 +453,81 @@
     body.player-mode .output-toolbar { display: none; }
     body.player-mode #status { display: none; }
     body.player-mode .input-hint { display: none; }
+    body.player-mode .llm-chat-bar { display: none !important; }
+
+    /* Player / demo: size + fullscreen (main page & shared play URLs) */
+    .player-embed-controls {
+      display: none;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 10px 14px;
+      width: 100%;
+      max-width: 640px;
+      margin-bottom: var(--space);
+      padding: 10px 12px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
+    body.player-mode .player-embed-controls { display: flex; }
+    .player-embed-controls label { display: inline-flex; align-items: center; gap: 8px; }
+    .player-embed-controls select {
+      padding: 6px 10px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--bg-raised);
+      color: var(--text);
+      font-size: 0.9rem;
+    }
+    .player-embed-controls .btn-link {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 500;
+      padding: 6px 10px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+    }
+    .player-embed-controls .btn-link:hover { background: var(--bg-hover); }
+    .player-viewport {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .player-viewport:fullscreen {
+      background: #0a0a0e;
+      width: 100%;
+      height: 100%;
+      padding: 12px;
+      box-sizing: border-box;
+    }
+    .player-viewport:fullscreen #wrap {
+      margin: 0;
+      box-shadow: none;
+      padding: 4px;
+    }
+    .player-viewport:fullscreen canvas#k7canvas {
+      width: min(100vmin, 100vw - 24px) !important;
+      height: min(100vmin, 100vw - 24px) !important;
+      max-width: 100%;
+      max-height: 100%;
+    }
+    body.player-mode.display-1x canvas#k7canvas { width: 256px; height: 256px; }
+    body.player-mode.display-2x canvas#k7canvas { width: 512px; height: 512px; max-width: calc(100vw - 32px); max-height: calc(100vh - 140px); }
+    body.player-mode.display-3x canvas#k7canvas { width: 768px; height: 768px; max-width: calc(100vw - 32px); max-height: calc(100vh - 140px); }
+    body.player-mode.display-fit canvas#k7canvas {
+      width: min(92vmin, calc(100vw - 32px));
+      height: min(92vmin, calc(100vw - 32px));
+      max-height: calc(100dvh - 160px);
+    }
+    body.player-mode.display-max canvas#k7canvas {
+      width: min(96vmin, calc(100vw - 24px));
+      height: min(96vmin, calc(100vw - 24px));
+      max-height: calc(100dvh - 140px);
+    }
 
     /* Mobile & touch */
     @media (max-width: 768px) {
@@ -464,7 +539,7 @@
       .output-side { width: 100%; min-width: 0; padding: var(--space); }
       .page-header .logo { width: min(280px, 85vw); }
       #wrap { max-width: 100%; }
-      canvas#k7canvas { width: 100%; max-width: 100vw; height: auto; aspect-ratio: 1; }
+      body:not(.player-mode) canvas#k7canvas { width: 100%; max-width: 100vw; height: auto; aspect-ratio: 1; }
       .panels { max-width: 100%; padding: 0 2px; }
       .tabs { overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; scrollbar-width: none; flex-wrap: nowrap; padding-bottom: 2px; }
       .tabs::-webkit-scrollbar { display: none; }
@@ -557,6 +632,7 @@
           <option value="ghostmark">Ghostmark (benchmark)</option>
           <option value="snake">Snake</option>
           <option value="sprites">Sprite demo</option>
+          <option value="spritestack_forest">Sprite-stack forest</option>
           <option value="mapscroll">Map scroll</option>
           <option value="tilemap_demo">Tilemap flags (flip/rotate)</option>
           <option value="palettes_demo">Palettes (pico8, gameboy, cga…)</option>
@@ -569,6 +645,9 @@
           <option value="rasterbars">Raster Bars</option>
           <option value="scroller">Scroller</option>
           <option value="phrack_demo">Phrack (terminal / CFP)</option>
+          <option value="graffiti">Graffiti (wall tag)</option>
+          <option value="justice_medley">Justice medley (tracker)</option>
+          <option value="mp3_transcription_demo">MP3→K7 track (auto demo)</option>
           <option value="fire">Fire</option>
           <option value="audiotest">Audio test (all features)</option>
           <option value="llm_demo">LLM (OpenAI-compatible API)</option>
@@ -747,9 +826,24 @@
   </div>
     </aside>
     <div class="output-side" id="output-side">
+      <div id="player-embed-controls" class="player-embed-controls" aria-label="Display options">
+        <label for="player-scale-select">Canvas size</label>
+        <select id="player-scale-select" title="Display scale (game stays 256×256)">
+          <option value="1">1× (256 px)</option>
+          <option value="2" selected>2× (512 px)</option>
+          <option value="3">3× (768 px)</option>
+          <option value="fit">Fit window</option>
+          <option value="max">Largest square</option>
+        </select>
+        <button type="button" id="player-fullscreen-btn" class="btn">Fullscreen</button>
+        <a href="index.html" class="btn-link">Home</a>
+        <a href="editor.html" class="btn-link">Editor</a>
+      </div>
+      <div id="player-viewport" class="player-viewport">
       <div id="wrap" tabindex="0" style="outline: none; position: relative;">
         <canvas id="k7canvas" width="256" height="256"></canvas>
         <div id="profiler-overlay" style="display:none;">FPS: — | — ms</div>
+      </div>
       </div>
       <p id="status">Loading Pyodide and K7…</p>
       <div id="llm-chat-bar" class="llm-chat-bar" style="margin-top: 8px; width: 100%; max-width: 524px; gap: 6px; align-items: center;">
@@ -798,6 +892,7 @@ for c in k7.take_key_queue(): # returns list of "\n", "\b", or 1-char strings
 k7.sfx(id)
 k7.play_sfx_chain(id)         # play chain 0–3 (built in Sounds → SFX chain)
 k7.set_music_track(id, "c4 e4 g4 c5")
+k7.set_music_step_ms(200)   # optional: note step interval for play_music (40–600, default 200)
 k7.play_music(channel, track_id)
 k7.stop_music(channel)
 k7.master_volume(0.5)   # 0–1
@@ -922,6 +1017,7 @@ js.game_loop_js = game_loop
       ghostmark: 'editor-examples/ghostmark.py',
       snake: 'editor-examples/snake.py',
       sprites: 'editor-examples/sprites.py',
+      spritestack_forest: 'editor-examples/spritestack_forest.py',
       mapscroll: 'editor-examples/mapscroll.py',
       tilemap_demo: 'editor-examples/tilemap_demo.py',
       palettes_demo: 'editor-examples/palettes_demo.py',
@@ -934,6 +1030,9 @@ js.game_loop_js = game_loop
       rasterbars: 'editor-examples/rasterbars.py',
       scroller: 'editor-examples/scroller.py',
       phrack_demo: 'editor-examples/phrack_demo.py',
+      graffiti: 'editor-examples/graffiti.py',
+      justice_medley: 'editor-examples/justice_medley.py',
+      mp3_transcription_demo: 'editor-examples/mp3_transcription_demo.py',
       fire: 'editor-examples/fire.py',
       audiotest: 'editor-examples/audiotest.py',
       llm_demo: 'editor-examples/llm_demo.py',
@@ -1133,6 +1232,7 @@ d4:square e4:square g4:square
         canvas.addEventListener('mousemove', (e) => { setMouseFromEvent(e); });
         canvas.addEventListener('mousedown', (e) => {
           e.preventDefault();
+          wrap.focus({ preventScroll: true });
           setMouseFromEvent(e);
           const i = (e.button === 0) ? 0 : (e.button === 2) ? 1 : -1;
           if (i >= 0) setButton(i, true);
@@ -1158,6 +1258,58 @@ d4:square e4:square g4:square
         canvas.addEventListener('touchcancel', (e) => {
           if (e.touches.length === 0) setButton(0, false);
         });
+
+        // Fullscreen: focus stays on toolbar button (outside fullscreen subtree) — keys never reach #wrap.
+        // Route keys from document capture; forward pointer on #player-viewport so mouse works on letterboxing too.
+        const vp = document.getElementById('player-viewport');
+        function fullscreenVp() {
+          return vp && document.fullscreenElement === vp;
+        }
+        function onFsKeyDown(e) {
+          if (!fullscreenVp()) return;
+          if (window._k7TextInputMode && (e.key === 'Backspace' || e.key === 'Enter' || (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey))) {
+            window._k7KeyQueue.push(e.key === 'Backspace' ? '\b' : e.key === 'Enter' ? '\n' : e.key);
+            e.preventDefault();
+            e.stopPropagation();
+            return;
+          }
+          const i = KEY_MAP[e.code];
+          if (i !== undefined) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!btnState.has(i)) btnpState.add(i);
+            btnState.add(i);
+          }
+        }
+        function onFsKeyUp(e) {
+          if (!fullscreenVp()) return;
+          const i = KEY_MAP[e.code];
+          if (i !== undefined) {
+            e.preventDefault();
+            e.stopPropagation();
+            btnState.delete(i);
+          }
+        }
+        document.addEventListener('keydown', onFsKeyDown, true);
+        document.addEventListener('keyup', onFsKeyUp, true);
+        if (vp) {
+          vp.addEventListener('pointermove', (e) => {
+            if (!fullscreenVp()) return;
+            setMouseFromEvent(e);
+          }, true);
+          vp.addEventListener('pointerdown', (e) => {
+            if (!fullscreenVp()) return;
+            wrap.focus({ preventScroll: true });
+            setMouseFromEvent(e);
+            if (e.button === 0) setButton(0, true);
+            else if (e.button === 2) setButton(1, true);
+          }, true);
+          vp.addEventListener('pointerup', (e) => {
+            if (!fullscreenVp()) return;
+            if (e.button === 0) setButton(0, false);
+            else if (e.button === 2) setButton(1, false);
+          }, true);
+        }
       }
     }
 
@@ -1168,6 +1320,7 @@ d4:square e4:square g4:square
     const sfxChains = Array.from({ length: SFX_CHAIN_COUNT }, () => [{ slot: 0, delay: 0 }]);
     const MUSIC_TRACKS = 8;
     const musicTracks = new Array(MUSIC_TRACKS).fill('');
+    let musicStepMs = 200;
     let musicIntervalId = null;
     let musicGainWhenPaused = 1;
     let audioCtx = null;
@@ -1494,6 +1647,11 @@ d4:square e4:square g4:square
     }
 
     function setupSound(k7) {
+      const scheduledSfxTimeouts = [];
+      function clearScheduledSfx() {
+        for (let i = 0; i < scheduledSfxTimeouts.length; i++) clearTimeout(scheduledSfxTimeouts[i]);
+        scheduledSfxTimeouts.length = 0;
+      }
       soundTokenExpander = (typeof k7.expand_sound_token === 'function')
         ? (t) => k7.expand_sound_token(t)
         : (t) => t;
@@ -1517,12 +1675,20 @@ d4:square e4:square g4:square
           const slot = Math.max(0, Math.min(SOUND_SLOTS - 1, Number(s.slot)|0));
           const delay = Math.max(0, Number(s.delay)|0);
           t += delay;
-          if (soundBank[slot]) setTimeout(() => playSoundString(soundBank[slot]), t);
+          if (soundBank[slot]) {
+            const tid = setTimeout(() => playSoundString(soundBank[slot]), t);
+            scheduledSfxTimeouts.push(tid);
+          }
         }
       };
       k7.set_music_track = (id, notation) => {
         const i = Math.max(0, Math.min(MUSIC_TRACKS - 1, Number(id)|0));
         musicTracks[i] = (notation != null && notation !== undefined) ? String(notation) : '';
+      };
+      k7.set_music_step_ms = (ms) => {
+        const x = Number(ms);
+        if (!Number.isFinite(x)) return;
+        musicStepMs = Math.max(40, Math.min(600, Math.round(x)));
       };
       k7.play_music = (channel, track_id) => {
         if (musicIntervalId) clearInterval(musicIntervalId);
@@ -1533,7 +1699,7 @@ d4:square e4:square g4:square
         const tokens = notation.trim().split(/\s+/);
         if (tokens.length === 0) return;
         let step = 0;
-        const stepMs = 200;
+        const stepMs = musicStepMs;
         musicIntervalId = setInterval(() => {
           if (gamePaused) return;
           playSoundString(tokens[step % tokens.length], musicGain);
@@ -1543,6 +1709,7 @@ d4:square e4:square g4:square
       k7.stop_music = (channel) => {
         if (musicIntervalId) clearInterval(musicIntervalId);
         musicIntervalId = null;
+        clearScheduledSfx();
       };
       k7.master_volume = (v) => {
         if (masterGain == null) return;
@@ -2737,6 +2904,9 @@ d4:square e4:square g4:square
         window._k7TextInputMode = false;
         window._k7KeyQueue = [];
         const k7 = globalThis.k7;
+        if (k7 && typeof k7.stop_music === 'function') {
+          k7.stop_music(0);
+        }
         if (k7 && typeof k7.reset_game_state === 'function') {
           k7.reset_game_state();
         } else if (k7) {
@@ -3144,9 +3314,82 @@ d4:square e4:square g4:square
       return params.get('player') === '1';
     }
 
+    function initPlayerEmbedUI() {
+      if (!isPlayerMode()) return;
+      const body = document.body;
+      const select = document.getElementById('player-scale-select');
+      const vp = document.getElementById('player-viewport');
+      const wrap = document.getElementById('wrap');
+      const fsBtn = document.getElementById('player-fullscreen-btn');
+      if (!select || !vp || !fsBtn) return;
+
+      const params = new URLSearchParams(location.search);
+      const validScale = { '1': true, '2': true, '3': true, 'fit': true, 'max': true };
+      let initial = params.get('scale');
+      if (!initial || !validScale[initial]) {
+        try {
+          initial = localStorage.getItem('k7_player_scale') || '2';
+        } catch (e) {
+          initial = '2';
+        }
+      }
+      if (!validScale[initial]) initial = '2';
+
+      function applyPlayerScale(v) {
+        if (!validScale[v]) v = '2';
+        body.classList.remove('display-1x', 'display-2x', 'display-3x', 'display-fit', 'display-max');
+        const map = { '1': 'display-1x', '2': 'display-2x', '3': 'display-3x', 'fit': 'display-fit', 'max': 'display-max' };
+        body.classList.add(map[v]);
+        select.value = v;
+        try {
+          localStorage.setItem('k7_player_scale', v);
+        } catch (e) { /* private mode */ }
+        const url = new URL(location.href);
+        url.searchParams.set('scale', v);
+        history.replaceState(null, '', url.toString());
+      }
+
+      applyPlayerScale(initial);
+
+      select.addEventListener('change', () => applyPlayerScale(select.value));
+
+      fsBtn.addEventListener('click', () => {
+        if (!document.fullscreenElement) {
+          vp.requestFullscreen?.().then(() => {
+            wrap?.focus({ preventScroll: true });
+          }).catch(() => {});
+        } else {
+          document.exitFullscreen?.();
+        }
+      });
+      document.addEventListener('fullscreenchange', () => {
+        fsBtn.textContent = document.fullscreenElement ? 'Exit fullscreen' : 'Fullscreen';
+        if (document.fullscreenElement === vp && wrap) {
+          requestAnimationFrame(() => {
+            wrap.focus({ preventScroll: true });
+            requestAnimationFrame(() => wrap.focus({ preventScroll: true }));
+          });
+        }
+      });
+
+      if (params.get('fs') === '1') {
+        const canvas = document.getElementById('k7canvas');
+        if (canvas) {
+          canvas.addEventListener(
+            'click',
+            () => {
+              vp.requestFullscreen?.().catch(() => {});
+            },
+            { once: true },
+          );
+        }
+      }
+    }
+
     async function main() {
       const playerMode = isPlayerMode();
       if (playerMode) document.body.classList.add('player-mode');
+      initPlayerEmbedUI();
       try {
         if (!playerMode) initTabs();
         status('Loading Pyodide…');

@@ -72,8 +72,7 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc0000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 """
 def gfx_to_sheet(hex_str):
-    lines = [L for L in hex_str.strip().split("\
-") if len(L) >= 128]
+    lines = [L for L in hex_str.strip().splitlines() if len(L) >= 128]
     sheet = bytearray(256 * 64)
     for y in range(min(64, len(lines))):
         for x in range(128):

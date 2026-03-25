@@ -15,6 +15,8 @@ def create_particle(x, y, color, speed, direction):
 def init():
     global fireworks
     fireworks = []
+    k7.set_sound(0, "f3:noise|envelope:perc|lowpass:dark|reverb:small c5:triangle|envelope:perc|hp:bright")
+    k7.set_sound(1, "d4:noise|envelope:perc g4:square|envelope:perc")
     for _ in range(5):
         particles = []
         for _ in range(120):
@@ -34,6 +36,7 @@ def update():
             x = random.randint(32, 32 + 64)
             y = random.randint(10, 60)
             c = random.randint(1, 15)
+            k7.sfx(random.randint(0, 1))
             for _ in range(120):
                 particles.append(create_particle(x, y, c, random.uniform(1, 5), random.uniform(0, 2 * math.pi)))
 

@@ -23,7 +23,7 @@
     }
     .message {
       text-align: center;
-      max-width: 360px;
+      max-width: 420px;
     }
     .message h1 { font-size: 1.25rem; margin: 0 0 0.5rem 0; color: #5dd9a8; }
     .message p { margin: 0 0 1rem 0; color: #9898a6; font-size: 0.95rem; line-height: 1.5; }
@@ -39,21 +39,78 @@
       transition: background 0.15s;
     }
     .message a:hover { background: rgba(93, 217, 168, 0.35); }
+    .demo-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+      align-items: center;
+      margin-top: 0.75rem;
+    }
+    .demo-size {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #9898a6;
+      font-size: 0.9rem;
+    }
+    .demo-size select {
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid #3a3a4a;
+      background: #1a1a24;
+      color: #e8e8ed;
+      font-size: 0.9rem;
+    }
+    .btn-demo {
+      display: inline-block;
+      padding: 10px 20px;
+      background: #5dd9a8;
+      color: #0f0f14;
+      border: none;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: background 0.15s;
+      font-family: inherit;
+    }
+    .btn-demo:hover { background: #6ee5b4; }
+    .btn-demo-secondary {
+      background: transparent;
+      color: #5dd9a8;
+      border: 1px solid #5dd9a8;
+    }
+    .btn-demo-secondary:hover { background: rgba(93, 217, 168, 0.15); }
+    .hint { margin-top: 0.75rem; font-size: 0.8rem; color: #6a6a78; line-height: 1.4; }
   </style>
 </head>
 <body>
   <div class="message" id="message">
     <h1>K7</h1>
     <p id="text">No game in URL. Create and share a game from the editor, or try the demo.</p>
-    <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:0.5rem;">
-      <a id="demo-link" href="editor.html?demo=1&player=1" class="btn-demo">Load demo</a>
+    <div class="demo-row">
+      <div class="demo-size">
+        <label for="demo-scale">Demo size</label>
+        <select id="demo-scale" title="Pixel size on screen (game is always 256×256)">
+          <option value="1">1× (256 px)</option>
+          <option value="2" selected>2× (512 px)</option>
+          <option value="3">3× (768 px)</option>
+          <option value="fit">Fit window</option>
+          <option value="max">Largest square</option>
+        </select>
+      </div>
+    </div>
+    <div class="demo-row">
+      <button type="button" class="btn-demo" id="demo-btn" title="Open showcase demo in play mode">Load demo</button>
+      <button type="button" class="btn-demo btn-demo-secondary" id="demo-fs-btn" title="Open demo; click the game once to go fullscreen (browser rule)">Demo + tap for fullscreen</button>
+    </div>
+    <div class="demo-row" style="margin-top: 0.5rem;">
       <a id="link" href="editor.html">Open editor</a>
     </div>
+    <p class="hint">In the demo player you can change size anytime, use Fullscreen, or open the editor. “Tap for fullscreen” asks for fullscreen on your first click on the game (required on many browsers).</p>
   </div>
-  <style>
-    .btn-demo { display:inline-block; padding:10px 20px; background:#5dd9a8; color:#0f0f14; border-radius:8px; text-decoration:none; font-weight:600; transition:background 0.15s; }
-    .btn-demo:hover { background:#6ee5b4; }
-  </style>
   <script>
     (function() {
       const params = new URLSearchParams(location.search);
@@ -62,6 +119,20 @@
         location.replace('editor.html?g=' + encodeURIComponent(g) + '&player=1');
         return;
       }
+
+      function demoUrl(extra) {
+        const scale = document.getElementById('demo-scale').value;
+        let q = 'demo=1&player=1&scale=' + encodeURIComponent(scale);
+        if (extra) q += '&' + extra;
+        return 'editor.html?' + q;
+      }
+
+      document.getElementById('demo-btn').addEventListener('click', function() {
+        location.href = demoUrl();
+      });
+      document.getElementById('demo-fs-btn').addEventListener('click', function() {
+        location.href = demoUrl('fs=1');
+      });
     })();
   </script>
 </body>
