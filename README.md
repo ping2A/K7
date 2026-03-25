@@ -232,7 +232,7 @@ python3 -m http.server 8080
 2. The URL is updated to `...editor.html?g=<encoded>` and copied to the clipboard. Share that link.
 3. Opening that URL in the **editor** restores state and you click **Run** to play. Opening it via **index.html** (or editor.html?g=...&player=1) runs the game immediately with no editor UI.
 
-State format: when the value after `g=` starts with **z**, it is base64 of deflate-compressed JSON. Otherwise it is legacy base64 of raw JSON. JSON fields: `code`, `sounds` (array of 16 strings), `chains` (array of 4 arrays of `{slot, delay}`), `map` (base64 of 256×32 bytes), `sprites` (base64 of 256×64 bytes).
+State format: when the value after `g=` starts with **z**, it is base64 of deflate-compressed JSON. Otherwise it is legacy base64 of raw JSON. JSON fields: `code`, `sounds` (array of 16 strings), `chains` (array of 4 arrays of `{slot, delay}`), `map` (base64 of 256×32 bytes), `sprites` (base64 of 256×64 bytes). Optional **`audio_cart`**: versioned DMG wave cart and related data (see **Audio → `audio_cart` and DMG** below); always **inside** the deflate blob so compression applies—do not move large hex blobs outside the JSON.
 
 ### Multiplayer & LLM (WebSocket server)
 
@@ -264,14 +264,36 @@ Native / cartridge code can use the full **64** sound bank where the host expose
 - **Per-note volume**: `c4@80` (0–100, scaled to linear gain) — parsed in **Rust** (`parse_token`) and in the **web** `parseSoundToken`.
 - **Per-note length**: Prefix letters `w`/`h`/`q`/`e`/`s`/`t` (whole … thirty-second) before the octave, e.g. `cq4`; or a beat count after the note in the first segment, e.g. `c4:0.5:sine` — see `parse_note_str_and_short_duration` / `parse_token` in `note_parser.rs`.
 - **Waveform on a note**: `c4:sine`, `c4:square`, `c4:triangle`, `c4:sawtooth`, `c4:noise`, `c4:pink`, `pwm:0.25`, or **`layer:sine:0.4,tri:0.3,sq:0.1`** (blended layers). Layered waveforms are synthesized in Rust (`generate_layered`).
-- **Effects** (examples; full list in `Effect::from_str`): `reverb:small|…`, `echo:medium`, `tremolo` / `trem`, `vibrato` / `vib`, `chorus`, `phaser`, `flanger`, `lowpass` / `lp`, `highpass` / `hp`, `distortion` / `dist`, `bitcrush`, `compressor` / `comp`, `limiter`, `delay`, `ringmod`, **`envelope:pluck`** (and other envelope presets or numeric ADSR), **`arp:maj`** / **`arpeggio`**, **`port`** / **`portamento`** (slide is applied when a positive target frequency is set; the default parsed target is often `0`, so many single-token patterns are a no-op for portamento), **`autopan`**, **`sidechain`**, **`eq`**.
+- **Effects** (examples; full list in `Effect::from_str`): `reverb:small|…`, `echo:medium`, `tremolo` / `trem`, `vibrato` / `vib`, `chorus`, `phaser`, `flanger`, `lowpass` / `lp`, `highpass` / `hp`, `distortion` / `dist`, `bitcrush`, `compressor` / `comp`, `limiter`, `delay`, `ringmod`, **`envelope:pluck`** (and other envelope presets or numeric ADSR), **`arp:maj`** / **`arpeggio`**, **`port`** / **`portamento`** (slide is applied when a positive target frequency is set; the default parsed target is often `0`, so many single-token patterns are a no-op for portamento), **`autopan`**, **`sidechain`**, **`eq`**. **DMG hardware-style** (pulse/noise only for envelope; all channels for length/pan; wave for output level): **`dmgenv:initial:increasing:pace`** (NRx2-style, 64 Hz steps; `pace` 0 = hold), **`dmglen:load:enabled`** (256 Hz length counter; higher `load` = shorter; `enabled` 0/1), **`dmgpan:left|right|l|r|off|mute|none`** (NR51-style routing into the stereo mix; default both speakers), **`dmgout:shift`** / **`dmgwaveout:shift`** (NR32 output level 0–3 for wave notes; 0 = mute).
+- **DMG waveforms** (implemented in `crates/k7/src/audio/dmg.rs`): **`dmgwave(`**…32 hex nibbles…**`)`** or **`dmgwave(HEX,level)`** with `level` 0–3 (NR32). **`dmgwavepreset(i)`** / **`dmgwavepreset(i,level)`** uses wave RAM entry `i` from the engine cart (`AudioEngine::dmg_wave_cart` / `set_dmg_wave_cart_hexes`); missing entries fall back to a flat mid wave. **`dmgpulse1(duty)`** or **`dmgpulse1(duty,pace,shift,subtract)`** (CH1 + sweep; `subtract` 1 = frequency down). **`dmgpulse2(duty)`** (CH2, no sweep). **`dmgnoise15`** / **`dmgnoise7`** pick NR43 from note pitch, or **`dmgnoise15(div,shift)`** / **`dmgnoise7(div,shift)`** with explicit divider 0–7 and shift 0–13. CH3 has **no** NRx2 envelope on real hardware; use `dmgout` / `volume` for level.
 - **Instrument shortcut**: `c4:piano:bright`, `e4:bass:punch`, `g4:drums:kick`, etc. — expanded by `expand_sound_token` into waveform + effect tokens (large preset table in `note_parser.rs`).
 
-Playback runs note events through waveform generation (including **layered** mixes), then **`apply_note_effects`** (envelope, arpeggio, filters, dynamics, and the rest). The **web** runtime can use the **Rust** synth via WASM or a **JS fallback** path for some tokens; both accept the same string syntax for editor games.
+Playback runs note events through waveform generation (including **layered** mixes), then **`apply_note_effects`** (envelope, arpeggio, filters, dynamics, and the rest). DMG generators use a **512 Hz frame sequencer** (length at 256 Hz, sweep at 128 Hz, volume envelope at 64 Hz). The **web** editor prefers the **Rust** path via **`render_sound`** (WASM); a **JS oscillator fallback** runs only when WASM is unavailable and does not model DMG hardware.
 
 ### Relation to Survie
 
 K7 reuses the **idea** of compact music-DSP strings and many of the same effect names, implemented in its own engine (no Bevy dependency). It is **not** a byte-for-byte match to another project’s preset count or internal `ARCHITECTURE.md`; treat Survie as **inspiration**. For the source of truth on what K7 actually parses and applies, see **`crates/k7/src/audio/note_parser.rs`** and **`crates/k7/src/audio/mod.rs`**.
+
+### `audio_cart` and DMG (share JSON + runtimes)
+
+- **Policy**: DMG audio behavior is implemented once in **`crates/k7`** so **native** (`k7-native` + cpal) and **web** (WASM) stay aligned; extend **`crates/k7/src/audio/dmg.rs`** tests when changing behavior.
+- **Where the data lives**: Custom wave tables and related audio metadata belong in the **same** compressed cart JSON as `code` / `sounds` / `map`, under an optional top-level **`audio_cart`**, so **deflate** keeps URLs small. Avoid huge raw hex in query parameters outside that blob.
+- **Shape (v1)**: Omitted in old links; unknown keys should be ignored. Include a **`v`** field inside `audio_cart` for forward-compatible migrations.
+
+```json
+"audio_cart": {
+  "v": 1,
+  "gb": {
+    "waves_hex": [
+      "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff"
+    ]
+  }
+}
+```
+
+Each string in **`waves_hex`** is **32 hex characters** (16 bytes of 4-bit nibbles). Invalid strings are skipped when loading. Notation **`dmgwavepreset(n)`** indexes this array (`0` = first entry). Additional keys (e.g. preset ID lists) may be added later with a **`v`** bump if the format breaks.
+
+- **Editor / Pyodide bridge**: On **Share game**, if `globalThis.__k7_share_audio_cart` is set to a plain object, it is copied into `state.audio_cart` and compressed with the rest. On **load from URL**, `audio_cart` is restored to `__k7_share_audio_cart`, and **`k7.set_dmg_wave_cart_hexes(waves_hex)`** is called when `gb.waves_hex` is present; otherwise **`k7.clear_dmg_wave_cart()`**. Python can read `js.__k7_share_audio_cart` when needed.
 
 ---
 
@@ -304,7 +326,7 @@ Click the game canvas (or game area) to focus it so key events are captured. But
 For chat, prompts, or any typed input inside the game: call `k7.text_input_mode(True)` (e.g. in `init()`). Then each frame call `for c in k7.take_key_queue():` and handle `c`: `"\n"` = Enter, `"\b"` = Backspace, else one character. Call `k7.text_input_mode(False)` when done. When enabled, those keys are not reported as btn/btnp.
 
 **Editor**: **P** = Pause / Resume game (pauses game loop and background music).
-- **Sound**: `set_sound(id, notation)`, `sfx(id)`, `play_sfx_chain(id)`, `set_music_track`, `play_music`, `stop_music`, `master_volume`, `mute_sfx`/`mute_music`.
+- **Sound**: `set_sound(id, notation)`, `sfx(id)`, `play_sfx_chain(id)`, `set_music_track`, `play_music`, `stop_music`, `master_volume`, `mute_sfx`/`mute_music`. **DMG cart** (optional): `set_dmg_wave_cart_hexes(array_of_strings)` loads `audio_cart.gb.waves_hex`; `clear_dmg_wave_cart()` resets it (e.g. after loading a cart without waves).
 - **Palette / flash**: `palette_swap(a,b)`, `flash(color, frames)`, `switch_palette(name)` (pico8, gameboy, cga, commodore64, atari2600), `palette_list()`.
 - **Map flags**: `mget_flags(cx,cy)`, `mset_flags(cx,cy,f)` — bits 1=flip_x, 2=flip_y, 4=rotate; used by `map_draw`.
 - **Multiplayer**: `ws_connect(url)`, `ws_send(msg)`, `ws_take_messages()`, `ws_connected()`.

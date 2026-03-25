@@ -325,6 +325,17 @@
     .sound-piano-roll .roll-label { font-size: 9px; color: var(--text-dim); padding: 2px 4px; display: flex; align-items: center; justify-content: flex-end; background: var(--bg-overlay); font-family: var(--font-mono); }
     .sound-step-cell.playing { box-shadow: 0 0 0 2px var(--accent); }
     .sound-step-cell.playing.playing-note { box-shadow: 0 0 0 2px var(--accent-hit); background: var(--accent-hit-dim); }
+    .sound-dmg-banner {
+      margin-bottom: var(--space-lg);
+      padding: var(--space) var(--space-lg);
+      background: var(--bg-overlay);
+      border: 1px solid var(--accent-dim);
+      border-radius: var(--radius-sm);
+      font-size: 0.875rem;
+      color: var(--text-muted);
+    }
+    .sound-dmg-banner p { margin: 0 0 var(--space) 0; line-height: 1.45; }
+    .sound-dmg-banner .btn { margin-right: 8px; margin-top: 2px; }
     .sound-format-ref { margin-bottom: var(--space-lg); color: var(--text-muted); font-size: 0.85rem; }
     .sound-format-ref summary { cursor: pointer; color: var(--accent); font-weight: 500; }
     .sound-ref-inner { margin-top: var(--space); padding: var(--space-lg); background: var(--bg-overlay); border-radius: var(--radius-sm); border: 1px solid var(--border); }
@@ -659,6 +670,7 @@
           <option value="mp3_transcription_demo">MP3→K7 track (auto demo)</option>
           <option value="fire">Fire</option>
           <option value="audiotest">Audio test (all features)</option>
+          <option value="dmg_audio">DMG audio (GB pulse / wave / noise)</option>
           <option value="llm_demo">LLM (OpenAI-compatible API)</option>
           <option value="sequencer">Sequence8-style sequencer</option>
           <option value="sable">Sable (falling sand)</option>
@@ -691,6 +703,11 @@
     </div>
     <div id="panel-sounds" class="tab-panel">
       <p>Sound editor: 16 slots. Click a row to select — <strong>Space</strong> to test. Edit in pattern (steps) or text. Use in code: <code>k7.set_sound(id, "c4 e4 g4")</code>, <code>k7.sfx(id)</code>.</p>
+      <div class="sound-dmg-banner" id="sound-dmg-banner">
+        <p><strong>Game Boy–style (DMG)</strong> — runnable cart: open the <strong>DMG audio</strong> example, <strong>Run</strong>, focus the canvas, then use <strong>←</strong> / <strong>→</strong> to pick and play each ~12–16&nbsp;s phrase. Slot&nbsp;4 / <strong>DMG demo</strong> is a ~25&nbsp;s one-shot tour for the sound editor.</p>
+        <button type="button" id="sound-open-dmg-example" class="btn btn-primary">Load DMG example game</button>
+        <button type="button" id="sound-open-dmg-example-stay" class="btn" title="Load example code but keep Sounds tab focused">Load code (stay here)</button>
+      </div>
       <div class="sound-panel-section">Slots 0–15</div>
       <div id="sound-editor-grid" class="sound-grid"></div>
       <p id="sound-selected-hint" class="sound-selected-hint">Selected: 0 — <code>k7.sfx(0)</code> · Space to test</p>
@@ -702,6 +719,7 @@
           <button type="button" id="sound-insert-arpeggio" class="btn" title="Append arpeggio">Arpeggio</button>
           <button type="button" id="sound-insert-scale" class="btn" title="Append C scale">Scale</button>
           <button type="button" id="sound-insert-rests" class="btn" title="Append 4 rests">Rest×4</button>
+          <button type="button" id="sound-insert-dmg-demo" class="btn" title="Replace slot with ~25s DMG tour (pulse, sweep, wave, noise)">DMG demo</button>
         </div>
         <div class="sound-pattern-actions">
           <label>From step:</label>
@@ -753,9 +771,11 @@
           <p><strong>Notes:</strong> c4 d4 e4 f4 g4 a4 b4 c5 (# or b = sharp/flat). Rest: <code>-</code> or <code>r</code>.</p>
           <p><strong>Volume</strong> (per note): <code>c4@100</code> (full), <code>c4@50</code> (half). Range 0–100.</p>
           <p><strong>Waveform</strong> (after <code>:</code>): <code>sine</code> <code>square</code> <code>triangle</code> <code>sawtooth</code> <code>noise</code>. <code>layer:sine:0.4,tri:0.3,sq:0.1</code> = blend layers.</p>
+          <p><strong>DMG (Game Boy–style)</strong> — <code>dmgwave(HEX)</code> or <code>dmgwave(HEX,level)</code> (32 hex nibbles; optional NR32 level 0–3); <code>dmgwavepreset(i)</code> / <code>dmgwavepreset(i,level)</code> (wave from share <code>audio_cart.gb.waves_hex</code>, loaded when you open a shared URL); <code>dmgpulse2(duty)</code> (CH2, no sweep); <code>dmgnoise15</code> / <code>dmgnoise7</code> or <code>dmgnoise15(d,shift)</code> / <code>dmgnoise7(d,shift)</code>; <code>dmgpulse1(duty)</code> or <code>dmgpulse1(duty,pace,shift,subtract)</code> (CH1 + sweep, 128&nbsp;Hz sweep ticks).</p>
+          <p><strong>DMG effects</strong> (after <code>|</code>): <code>dmgenv:i:inc:pace</code> (pulse/noise volume envelope), <code>dmglen:load:on</code> (length), <code>dmgpan:left|right|off</code>, <code>dmgout:shift</code> / <code>dmgwaveout:shift</code> (wave NR32).</p>
           <p><strong>Instruments</strong> (survie-style): <code>note:category:preset</code>. e.g. <code>c4:piano:bright</code> <code>e4:chip:pulse</code> <code>g4:pluck:soft</code>. Categories: piano, lead, bass, chip, pluck, pad, drums (each with presets: bright, dark, pulse, saw, etc.).</p>
           <p><strong>Effects</strong> (after <code>|</code>): <code>lowpass</code> <code>highpass</code> <code>echo</code> <code>reverb</code> <code>envelope</code> <code>tremolo</code> <code>distortion</code> (with presets or params).</p>
-          <p><strong>Examples:</strong> <code>c4@100 e4@80 g4@60</code> &nbsp; <code>c4:piano:bright</code> &nbsp; <code>e4:chip:pulse|echo:short</code> &nbsp; <code>c4:sine|reverb:small</code></p>
+          <p><strong>Examples:</strong> <code>c4@100 e4@80 g4@60</code> &nbsp; <code>c4:piano:bright</code> &nbsp; <code>e4:chip:pulse|echo:short</code> &nbsp; <code>c4:sine|reverb:small</code> &nbsp; <code>c4:dmgpulse1(2,3,2,0)</code> (pulse + sweep)</p>
           <details style="margin-top:10px;">
             <summary style="cursor:pointer;color:#8cf;">Pattern examples — click Insert to paste into selected slot</summary>
             <ul style="margin:6px 0 4px 1.2em;padding:0;list-style:none;">
@@ -765,6 +785,9 @@
               <li><strong>Crescendo:</strong> <code>c4@30 e4@50 g4@70 c5@100</code> <button type="button" class="btn sound-insert-example" data-insert="c4@30 e4@50 g4@70 c5@100" style="margin-left:6px;padding:2px 6px;font-size:10px;">Insert</button></li>
               <li><strong>Staccato:</strong> <code>cq4 eq4 gq4 cq5</code> <button type="button" class="btn sound-insert-example" data-insert="cq4 eq4 gq4 cq5" style="margin-left:6px;padding:2px 6px;font-size:10px;">Insert</button></li>
               <li><strong>Piano:</strong> <code>c4:piano:bright e4:piano:bright g4:piano:bright</code> <button type="button" class="btn sound-insert-example" data-insert="c4:piano:bright e4:piano:bright g4:piano:bright" style="margin-left:6px;padding:2px 6px;font-size:10px;">Insert</button></li>
+              <li><strong>DMG tour (~25&nbsp;s, <code>:N</code> = half-beats):</strong> <code>c4:dmgpulse1(2):4 … c5:dmgnoise7(3,3):6</code> <button type="button" class="btn sound-insert-example" data-insert="c4:dmgpulse1(2):4 d4:dmgpulse1(2):4 e4:dmgpulse1(2):6 c3:dmgpulse1(2,3,2,0):6 d3:dmgpulse1(2,3,2,0):6 c4:dmgwave(02468aceeca8642002468aceeca86420):4 e4:dmgwave(02468aceeca8642002468aceeca86420):6 c5:dmgnoise15(4,4):4 g5:dmgnoise15(3,5):4 c5:dmgnoise7(3,3):6" style="margin-left:6px;padding:2px 6px;font-size:10px;">Insert</button></li>
+              <li><strong>DMG wave only:</strong> <code>e4:dmgwave(0123456789abcdef0123456789abcdef)</code> <button type="button" class="btn sound-insert-example" data-insert="e4:dmgwave(0123456789abcdef0123456789abcdef)" style="margin-left:6px;padding:2px 6px;font-size:10px;">Insert</button></li>
+              <li><strong>DMG noise (7-bit):</strong> <code>g4:dmgnoise7(3,3)</code> <button type="button" class="btn sound-insert-example" data-insert="g4:dmgnoise7(3,3)" style="margin-left:6px;padding:2px 6px;font-size:10px;">Insert</button></li>
             </ul>
           </details>
         </div>
@@ -1044,6 +1067,7 @@ js.game_loop_js = game_loop
       mp3_transcription_demo: 'editor-examples/mp3_transcription_demo.py',
       fire: 'editor-examples/fire.py',
       audiotest: 'editor-examples/audiotest.py',
+      dmg_audio: 'editor-examples/dmg_audio.py',
       llm_demo: 'editor-examples/llm_demo.py',
       sequencer: 'editor-examples/sequencer.py',
       sable: 'editor-examples/sable.py',
@@ -1336,7 +1360,33 @@ d4:square e4:square g4:square
     let masterGain = null;
     let sfxGain = null;
     let musicGain = null;
+    /** Stops overlapping SFX: BufferSources / oscillators routed to sfxGain. */
+    let sfxActiveSources = [];
+    let scheduledSfxTimeouts = [];
     let soundTokenExpander = (t) => t;
+
+    function clearScheduledSfx() {
+      for (let i = 0; i < scheduledSfxTimeouts.length; i++) clearTimeout(scheduledSfxTimeouts[i]);
+      scheduledSfxTimeouts.length = 0;
+    }
+
+    function stopSfxPlayback() {
+      for (let i = 0; i < sfxActiveSources.length; i++) {
+        try {
+          const n = sfxActiveSources[i];
+          if (n && typeof n.stop === 'function') n.stop(0);
+        } catch (e) {}
+      }
+      sfxActiveSources = [];
+      if (sfxGain && masterGain && audioCtx) {
+        try {
+          sfxGain.disconnect();
+        } catch (e) {}
+        try {
+          sfxGain.connect(masterGain);
+        } catch (e) {}
+      }
+    }
     // Instrument list for editor (expansion is in Rust). id = category:preset.
     const INSTRUMENT_OPTIONS = [
       { id: 'piano:bright', label: 'Piano / Bright' }, { id: 'piano:dark', label: 'Piano / Dark' },
@@ -1583,6 +1633,8 @@ d4:square e4:square g4:square
         ensureAudioGains();
         const dest = outNode != null ? outNode : sfxGain;
         if (!dest) return;
+        const isSfxDest = dest === sfxGain;
+        if (isSfxDest) stopSfxPlayback();
         const k7 = globalThis.k7 || window.k7;
         if (k7 && typeof k7.render_sound === 'function' && typeof k7.get_audio_sample_rate === 'function') {
           const samples = k7.render_sound(str);
@@ -1594,6 +1646,13 @@ d4:square e4:square g4:square
           const src = audioCtx.createBufferSource();
           src.buffer = buf;
           src.connect(dest);
+          if (isSfxDest) {
+            sfxActiveSources.push(src);
+            src.onended = () => {
+              const j = sfxActiveSources.indexOf(src);
+              if (j >= 0) sfxActiveSources.splice(j, 1);
+            };
+          }
           src.start(0);
           return;
         }
@@ -1620,6 +1679,7 @@ d4:square e4:square g4:square
               g.connect(sumGain);
               osc.start(t);
               osc.stop(t + dur + 0.1);
+              if (isSfxDest) sfxActiveSources.push(osc);
             }
             node = sumGain;
           } else {
@@ -1627,6 +1687,7 @@ d4:square e4:square g4:square
             node = osc;
             osc.start(t);
             osc.stop(t + dur + 0.1);
+            if (isSfxDest) sfxActiveSources.push(osc);
           }
           for (const eff of parsed.effects) {
             const [name, ...params] = eff.split(':').map(s => s.trim());
@@ -1656,11 +1717,6 @@ d4:square e4:square g4:square
     }
 
     function setupSound(k7) {
-      const scheduledSfxTimeouts = [];
-      function clearScheduledSfx() {
-        for (let i = 0; i < scheduledSfxTimeouts.length; i++) clearTimeout(scheduledSfxTimeouts[i]);
-        scheduledSfxTimeouts.length = 0;
-      }
       soundTokenExpander = (typeof k7.expand_sound_token === 'function')
         ? (t) => k7.expand_sound_token(t)
         : (t) => t;
@@ -1672,6 +1728,7 @@ d4:square e4:square g4:square
         if (typeof refreshPatternStrip === 'function') refreshPatternStrip();
       };
       k7.sfx = (id) => {
+        clearScheduledSfx();
         const i = Math.max(0, Math.min(SOUND_SLOTS - 1, Number(id)|0));
         playSoundString(soundBank[i]);
       };
@@ -1800,7 +1857,14 @@ d4:square e4:square g4:square
       const grid = document.getElementById('sound-editor-grid');
       const hintEl = document.getElementById('sound-selected-hint');
       if (!grid) return;
-      const defaults = ['c4 e4 g4 c5', 'c4:piano:bright', 'c4@100 e4@80 g4@60 c5@100', 'e4:chip:pulse|echo:short', '', '', '', '', '', '', '', '', '', '', ''];
+      const DMG_W = '02468aceeca8642002468aceeca86420';
+      const DMG_DEMO_SLOT = [
+        'c4:dmgpulse1(2):4 d4:dmgpulse1(2):4 e4:dmgpulse1(2):6',
+        'c3:dmgpulse1(2,3,2,0):6 d3:dmgpulse1(2,3,2,0):6',
+        `c4:dmgwave(${DMG_W}):4 e4:dmgwave(${DMG_W}):6`,
+        'c5:dmgnoise15(4,4):4 g5:dmgnoise15(3,5):4 c5:dmgnoise7(3,3):6',
+      ].join(' ');
+      const defaults = ['c4 e4 g4 c5', 'c4:piano:bright', 'c4@100 e4@80 g4@60 c5@100', 'e4:chip:pulse|echo:short', DMG_DEMO_SLOT, '', '', '', '', '', '', '', '', '', '', ''];
       for (let i = 0; i < SOUND_SLOTS; i++) {
         if (soundBank[i] === '') soundBank[i] = defaults[i] || '';
         const row = document.createElement('div');
@@ -2267,6 +2331,18 @@ d4:square e4:square g4:square
       document.getElementById('sound-insert-arpeggio')?.addEventListener('click', () => appendToCurrentSlot('c4|envelope:pluck e4|envelope:pluck g4|envelope:pluck c5|envelope:pluck'));
       document.getElementById('sound-insert-scale')?.addEventListener('click', () => appendToCurrentSlot('c4 d4 e4 f4 g4 a4 b4 c5'));
       document.getElementById('sound-insert-rests')?.addEventListener('click', () => appendToCurrentSlot('- - - -'));
+      document.getElementById('sound-insert-dmg-demo')?.addEventListener('click', () => {
+        const str = DMG_DEMO_SLOT;
+        soundBank[selectedSoundSlot] = str;
+        const inputEl = document.getElementById('sound-input-' + selectedSoundSlot);
+        if (inputEl) inputEl.value = str;
+        const row = grid.querySelector('.sound-slot-row.selected');
+        if (row) {
+          const p = row.querySelector('.sound-slot-preview');
+          if (p) { p.textContent = (str || '—').slice(0, 24); p.title = str || '—'; }
+        }
+        if (typeof refreshPatternStrip === 'function') refreshPatternStrip();
+      });
       document.querySelectorAll('.sound-insert-example').forEach(btn => {
         btn.addEventListener('click', () => {
           const str = btn.getAttribute('data-insert') || '';
@@ -2880,6 +2956,10 @@ d4:square e4:square g4:square
     function togglePause() {
       if (rafId == null) return;
       gamePaused = !gamePaused;
+      if (gamePaused) {
+        stopSfxPlayback();
+        clearScheduledSfx();
+      }
       if (musicGain != null) {
         if (gamePaused) {
           musicGainWhenPaused = musicGain.gain.value;
@@ -3044,6 +3124,15 @@ d4:square e4:square g4:square
           const chatBar = document.getElementById('llm-chat-bar');
           if (chatBar) chatBar.classList.toggle('visible', false);
         }
+        function loadDmgAudioExample(switchToCodeTab) {
+          exampleSelect.value = 'dmg_audio';
+          loadExample('dmg_audio');
+          updateExampleUI('dmg_audio');
+          if (switchToCodeTab) {
+            document.querySelector('.tabs button[data-tab="code"]')?.click();
+          }
+          status('Loaded DMG audio example — Run, focus canvas, ← / → to change demo');
+        }
         exampleSelect.addEventListener('change', () => {
           const val = exampleSelect.value;
           loadExample(val);
@@ -3053,6 +3142,10 @@ d4:square e4:square g4:square
         if (mm && (exampleSelect.value === 'multiplayer' || exampleSelect.value === 'shared_drawing')) mm.style.display = 'block';
         const chatBar = document.getElementById('llm-chat-bar');
         if (chatBar && exampleSelect.value === 'llm_demo') chatBar.classList.add('visible');
+        const soundOpenDmg = document.getElementById('sound-open-dmg-example');
+        const soundOpenDmgStay = document.getElementById('sound-open-dmg-example-stay');
+        if (soundOpenDmg) soundOpenDmg.addEventListener('click', () => loadDmgAudioExample(true));
+        if (soundOpenDmgStay) soundOpenDmgStay.addEventListener('click', () => loadDmgAudioExample(false));
       }
       const loadDemoBtn = document.getElementById('load-demo-btn');
       if (loadDemoBtn && exampleSelect) {
@@ -3611,6 +3704,21 @@ d4:square e4:square g4:square
           if (strip && strip._refresh) strip._refresh();
         } catch (e) { console.warn('Restore sprites:', e); }
       }
+      if (state.audio_cart != null && typeof state.audio_cart === 'object') {
+        globalThis.__k7_share_audio_cart = state.audio_cart;
+      } else {
+        delete globalThis.__k7_share_audio_cart;
+      }
+      if (k7) {
+        const waves = (state.audio_cart && state.audio_cart.gb && Array.isArray(state.audio_cart.gb.waves_hex))
+          ? state.audio_cart.gb.waves_hex
+          : null;
+        if (waves && typeof k7.set_dmg_wave_cart_hexes === 'function') {
+          k7.set_dmg_wave_cart_hexes(waves);
+        } else if (typeof k7.clear_dmg_wave_cart === 'function') {
+          k7.clear_dmg_wave_cart();
+        }
+      }
     }
     async function buildShareUrl() {
       const k7 = globalThis.k7;
@@ -3620,6 +3728,9 @@ d4:square e4:square g4:square
         sounds: soundBank ? soundBank.slice() : [],
         chains: sfxChains ? sfxChains.map(c => c.map(s => ({ slot: s.slot, delay: s.delay }))) : []
       };
+      if (globalThis.__k7_share_audio_cart != null && typeof globalThis.__k7_share_audio_cart === 'object') {
+        state.audio_cart = globalThis.__k7_share_audio_cart;
+      }
       if (k7 && typeof k7.get_map === 'function') {
         const mapCells = k7.get_map();
         const mapFlags = (typeof k7.get_map_flags === 'function') ? k7.get_map_flags() : new Uint8Array(mapCells.length);

@@ -442,6 +442,24 @@ impl K7Web {
         AUDIO_SAMPLE_RATE
     }
 
+    /// Load DMG wave RAM entries for `dmgwavepreset(n)` (each string: 32 hex nibbles → 16 bytes). Skips invalid entries.
+    #[wasm_bindgen]
+    pub fn set_dmg_wave_cart_hexes(&self, hexes: &js_sys::Array) {
+        let mut v: Vec<String> = Vec::with_capacity(hexes.length() as usize);
+        for i in 0..hexes.length() {
+            let val = hexes.get(i);
+            if let Some(s) = val.as_string() {
+                v.push(s);
+            }
+        }
+        self.audio_engine.borrow_mut().set_dmg_wave_cart_hexes(&v);
+    }
+
+    #[wasm_bindgen]
+    pub fn clear_dmg_wave_cart(&self) {
+        self.audio_engine.borrow_mut().clear_dmg_wave_cart();
+    }
+
     /// Draw current frame to canvas (call each frame).
     #[wasm_bindgen]
     pub fn draw_to_canvas(&self, canvas_id: &str) -> Result<(), JsValue> {

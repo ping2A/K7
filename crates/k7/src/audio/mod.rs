@@ -2,6 +2,7 @@
 //! Full synth, SFX and effects from survie tracker.
 
 mod synth;
+mod dmg;
 mod note_parser;
 
 use std::time::Duration;
@@ -26,6 +27,8 @@ pub struct AudioEngine {
     pub music_tracks: [Option<String>; MUSIC_TRACK_COUNT],
     /// 4 channels: each can play a sound or a music track.
     pub channels: [ChannelState; AUDIO_CHANNELS],
+    /// Custom DMG wave tables for `dmgwavepreset(n)` (16 bytes each).
+    pub dmg_wave_cart: Vec<[u8; 16]>,
 }
 
 #[derive(Clone, Default)]
@@ -46,7 +49,23 @@ impl AudioEngine {
             sounds: std::array::from_fn(|_| None),
             music_tracks: std::array::from_fn(|_| None),
             channels: std::array::from_fn(|_| ChannelState::default()),
+            dmg_wave_cart: Vec::new(),
         }
+    }
+
+    /// Replace DMG wave cart (e.g. from share JSON `audio_cart.gb.waves_hex`). Invalid hex entries are skipped.
+    pub fn set_dmg_wave_cart_hexes(&mut self, hexes: &[String]) {
+        self.dmg_wave_cart.clear();
+        for h in hexes {
+            if let Some(ram) = dmg::parse_wave_hex32(h) {
+                self.dmg_wave_cart.push(ram);
+            }
+        }
+    }
+
+    /// Clear cart entries (preset indices resolve to a flat mid wave).
+    pub fn clear_dmg_wave_cart(&mut self) {
+        self.dmg_wave_cart.clear();
     }
 
     /// Define sound at index 0..63 with notation (e.g. "c4 e4 g4").
@@ -126,7 +145,16 @@ impl AudioEngine {
             let vol = volume * note.volume;
             let mut samples = self.generate_note_samples(note, dur, vol);
             self.apply_note_effects(&mut samples, note);
-            out.extend_from_slice(&samples[..num_samples.min(samples.len())]);
+            let pan = dmg_pan_from_note(note);
+            let g = (u8::from(pan.left) + u8::from(pan.right)) as f32;
+            let g = g.min(1.0);
+            let take = num_samples.min(samples.len());
+            if g < 1.0 {
+                for s in &mut samples[..take] {
+                    *s *= g;
+                }
+            }
+            out.extend_from_slice(&samples[..take]);
         }
         out
     }
@@ -152,10 +180,13 @@ impl AudioEngine {
             let vol = ch_vol * note.volume;
             let mut samples = self.generate_note_samples(&note, dur, vol);
             self.apply_note_effects(&mut samples, &note);
+            let pan = dmg_pan_from_note(&note);
+            let gl = if pan.left { 1.0f32 } else { 0.0 };
+            let gr = if pan.right { 1.0f32 } else { 0.0 };
             for i in 0..to_gen.min(samples.len()) {
                 let s = samples[i];
-                buffer[i * 2] += s;
-                buffer[i * 2 + 1] += s;
+                buffer[i * 2] += s * gl;
+                buffer[i * 2 + 1] += s * gr;
             }
         }
         for ch in &mut self.channels {
@@ -199,7 +230,12 @@ impl AudioEngine {
             Waveform::Pwm(pw) => Some(synth::WaveformType::Pwm(*pw)),
             Waveform::Noise => Some(synth::WaveformType::Noise),
             Waveform::PinkNoise => Some(synth::WaveformType::PinkNoise),
-            Waveform::Layered(_) => None,
+            Waveform::Layered(_)
+            | Waveform::DmgWave { .. }
+            | Waveform::DmgWaveCart { .. }
+            | Waveform::DmgNoise { .. }
+            | Waveform::DmgPulse1 { .. }
+            | Waveform::DmgPulse2 { .. } => None,
         }
     }
 
@@ -212,6 +248,84 @@ impl AudioEngine {
                     .map(|(b, w)| (Self::base_to_type(b), *w))
                     .collect();
                 self.synth.generate_layered(note.frequency(), duration, volume, &conv)
+            }
+            Waveform::DmgWave { ram, output_shift } => {
+                let (_, len, _, wsh) = merge_dmg_hw(note, *output_shift);
+                dmg::render_dmg_wave(
+                    ram,
+                    wsh,
+                    note.frequency(),
+                    duration,
+                    self.sample_rate,
+                    volume,
+                    len,
+                )
+            }
+            Waveform::DmgWaveCart {
+                index,
+                output_shift,
+            } => {
+                let ram = self
+                    .dmg_wave_cart
+                    .get(*index)
+                    .copied()
+                    .unwrap_or_else(dmg_flat_wave_ram);
+                let (_, len, _, wsh) = merge_dmg_hw(note, *output_shift);
+                dmg::render_dmg_wave(
+                    &ram,
+                    wsh,
+                    note.frequency(),
+                    duration,
+                    self.sample_rate,
+                    volume,
+                    len,
+                )
+            }
+            Waveform::DmgNoise { nr43, seven_bit } => {
+                let nr43 = match nr43 {
+                    Some(b) => *b,
+                    None => {
+                        let b = dmg::nr43_best_fit(note.frequency());
+                        (b & 0xF7) | ((*seven_bit as u8) << 3)
+                    }
+                };
+                let (env, len, _, _) = merge_dmg_hw(note, 1);
+                dmg::render_dmg_noise(nr43, duration, self.sample_rate, volume, env, len)
+            }
+            Waveform::DmgPulse1 {
+                duty,
+                sweep_pace,
+                sweep_shift,
+                sweep_subtract,
+            } => {
+                let (env, len, _, _) = merge_dmg_hw(note, 1);
+                dmg::render_dmg_pulse(
+                    *duty,
+                    Some(dmg::DmgSweep {
+                        pace: *sweep_pace,
+                        shift: *sweep_shift,
+                        subtract: *sweep_subtract,
+                    }),
+                    note.frequency(),
+                    duration,
+                    self.sample_rate,
+                    volume,
+                    env,
+                    len,
+                )
+            }
+            Waveform::DmgPulse2 { duty } => {
+                let (env, len, _, _) = merge_dmg_hw(note, 1);
+                dmg::render_dmg_pulse(
+                    *duty,
+                    None,
+                    note.frequency(),
+                    duration,
+                    self.sample_rate,
+                    volume,
+                    env,
+                    len,
+                )
             }
             _ => {
                 let wt = Self::waveform_to_type(&note.waveform).unwrap_or(synth::WaveformType::Triangle);
@@ -261,7 +375,62 @@ impl AudioEngine {
                 Effect::Eq { low_gain, mid_gain, high_gain } => {
                     self.synth.apply_eq(samples, *low_gain, *mid_gain, *high_gain);
                 }
+                Effect::DmgGbEnvelope { .. }
+                | Effect::DmgLength { .. }
+                | Effect::DmgPan { .. }
+                | Effect::DmgWaveOut { .. } => {}
             }
         }
     }
+}
+
+fn dmg_flat_wave_ram() -> [u8; 16] {
+    [0x88; 16]
+}
+
+/// Merge DMG hardware-style effects into envelope, length, pan, and wave output level.
+fn merge_dmg_hw(note: &NoteEvent, base_wave_shift: u8) -> (dmg::DmgHwEnvelope, dmg::DmgHwLength, dmg::DmgStereoPan, u8) {
+    use note_parser::Effect;
+    let mut env = dmg::DmgHwEnvelope::default();
+    let mut len = dmg::DmgHwLength::default();
+    let mut pan = dmg::DmgStereoPan::default();
+    let mut wsh = base_wave_shift.min(3);
+    for e in &note.effects {
+        match e {
+            Effect::DmgGbEnvelope {
+                initial,
+                increasing,
+                pace,
+            } => {
+                env.initial = (*initial).min(15);
+                env.increasing = *increasing;
+                env.pace = (*pace).min(7);
+            }
+            Effect::DmgLength { load, enabled } => {
+                len.load = (*load).min(63);
+                len.enabled = *enabled;
+            }
+            Effect::DmgPan { left, right } => {
+                pan.left = *left;
+                pan.right = *right;
+            }
+            Effect::DmgWaveOut { shift } => {
+                wsh = (*shift).min(3);
+            }
+            _ => {}
+        }
+    }
+    (env, len, pan, wsh)
+}
+
+fn dmg_pan_from_note(note: &NoteEvent) -> dmg::DmgStereoPan {
+    use note_parser::Effect;
+    let mut pan = dmg::DmgStereoPan::default();
+    for e in &note.effects {
+        if let Effect::DmgPan { left, right } = e {
+            pan.left = *left;
+            pan.right = *right;
+        }
+    }
+    pan
 }

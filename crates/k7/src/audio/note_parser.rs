@@ -1,8 +1,12 @@
 //! Parse melody notation with waveform and effects (from survie tracker).
 //! Format: "c4 d4 e4" or "c4:sine|reverb:small d4:tri|lp:warm"
 //! Instruments: "c4:piano:bright" expands to waveform+effects (survie-style).
+//! DMG-style: `dmgwave(32 hex nibbles)`, `dmgnoise15`, `dmgnoise7`, `dmgnoise15(d,shift)`,
+//! `dmgpulse1(duty)` or `dmgpulse1(duty,pace,shift,subtract)`.
 
 use std::time::Duration;
+
+use super::dmg;
 
 /// Instrument presets: category:preset -> expansion (Survie-style, 34 categories, 110+ presets).
 fn get_instrument_expansion(category: &str, preset: &str) -> Option<&'static str> {
@@ -296,12 +300,148 @@ pub enum Waveform {
     Pwm(f32),
     Noise,
     PinkNoise,
+    /// Game Boy CH3: 16 bytes wave RAM; `output_shift` NR32 0–3 (0=mute, 1=100%, 2=50%, 3=25%).
+    DmgWave {
+        ram: [u8; 16],
+        output_shift: u8,
+    },
+    /// CH3 wave from `AudioEngine` cart entry (set via host `set_dmg_wave_cart_hexes`).
+    DmgWaveCart {
+        index: usize,
+        output_shift: u8,
+    },
+    /// CH4 LFSR; `nr43` None = pick divider/shift from note frequency; `seven_bit` = NR43 bit 3.
+    DmgNoise {
+        nr43: Option<u8>,
+        seven_bit: bool,
+    },
+    /// CH1 pulse + sweep (`subtract` = NR10 direction bit: subtraction vs addition).
+    DmgPulse1 {
+        duty: u8,
+        sweep_pace: u8,
+        sweep_shift: u8,
+        sweep_subtract: bool,
+    },
+    /// CH2-style pulse (no sweep).
+    DmgPulse2 {
+        duty: u8,
+    },
     Layered(Vec<(WaveformBase, f32)>),
+}
+
+fn strip_paren_content<'a>(prefix: &'a str, s: &'a str) -> Option<&'a str> {
+    let rest = s.strip_prefix(prefix)?;
+    let end = rest.rfind(')')?;
+    Some(&rest[..end])
+}
+
+/// `dmgwave(HEX)` or `dmgwave(HEX,level)` with level 0–3 (NR32).
+fn parse_dmgwave_ram_and_level(inner: &str) -> Option<([u8; 16], u8)> {
+    let inner = inner.trim();
+    if let Some((hex, lvl_s)) = inner.rsplit_once(',') {
+        if let Ok(lvl) = lvl_s.trim().parse::<u8>() {
+            if lvl <= 3 {
+                if let Some(ram) = dmg::parse_wave_hex32(hex.trim()) {
+                    return Some((ram, lvl));
+                }
+            }
+        }
+    }
+    dmg::parse_wave_hex32(inner).map(|ram| (ram, 1))
 }
 
 impl Waveform {
     pub fn from_str(s: &str) -> Option<Self> {
         let s = s.to_lowercase();
+        if let Some(inner) = strip_paren_content("dmgwave(", &s) {
+            if let Some((ram, output_shift)) = parse_dmgwave_ram_and_level(inner) {
+                return Some(Waveform::DmgWave {
+                    ram,
+                    output_shift,
+                });
+            }
+            return None;
+        }
+        if let Some(inner) = strip_paren_content("dmgwavepreset(", &s) {
+            let parts: Vec<&str> = inner.split(',').map(str::trim).collect();
+            let idx = parts.first()?.parse::<usize>().ok()?;
+            let output_shift = parts
+                .get(1)
+                .and_then(|x| x.parse::<u8>().ok())
+                .unwrap_or(1)
+                .min(3);
+            return Some(Waveform::DmgWaveCart {
+                index: idx,
+                output_shift,
+            });
+        }
+        if let Some(inner) = strip_paren_content("dmgpulse1(", &s) {
+            let parts: Vec<u8> = inner
+                .split(',')
+                .filter_map(|p| p.trim().parse::<u8>().ok())
+                .collect();
+            let duty = *parts.first()?;
+            let sweep_pace = parts.get(1).copied().unwrap_or(0).min(7);
+            let sweep_shift = parts.get(2).copied().unwrap_or(0).min(7);
+            let sweep_subtract = parts.get(3).copied().unwrap_or(0) != 0;
+            return Some(Waveform::DmgPulse1 {
+                duty: duty.min(3),
+                sweep_pace,
+                sweep_shift,
+                sweep_subtract,
+            });
+        }
+        if let Some(inner) = strip_paren_content("dmgpulse2(", &s) {
+            let duty = inner
+                .split(',')
+                .next()?
+                .trim()
+                .parse::<u8>()
+                .ok()?
+                .min(3);
+            return Some(Waveform::DmgPulse2 { duty });
+        }
+        if let Some(inner) = strip_paren_content("dmgnoise15(", &s) {
+            let parts: Vec<u8> = inner
+                .split(',')
+                .filter_map(|p| p.trim().parse::<u8>().ok())
+                .collect();
+            let div = *parts.first()?;
+            let shift = *parts.get(1)?;
+            let nr43 = dmg::pack_nr43(div.min(7), shift.min(13), false);
+            return Some(Waveform::DmgNoise {
+                nr43: Some(nr43),
+                seven_bit: false,
+            });
+        }
+        if let Some(inner) = strip_paren_content("dmgnoise7(", &s) {
+            let parts: Vec<u8> = inner
+                .split(',')
+                .filter_map(|p| p.trim().parse::<u8>().ok())
+                .collect();
+            let div = *parts.first()?;
+            let shift = *parts.get(1)?;
+            let nr43 = dmg::pack_nr43(div.min(7), shift.min(13), true);
+            return Some(Waveform::DmgNoise {
+                nr43: Some(nr43),
+                seven_bit: true,
+            });
+        }
+        match s.as_str() {
+            "dmgnoise15" => {
+                return Some(Waveform::DmgNoise {
+                    nr43: None,
+                    seven_bit: false,
+                });
+            }
+            "dmgnoise7" => {
+                return Some(Waveform::DmgNoise {
+                    nr43: None,
+                    seven_bit: true,
+                });
+            }
+            _ => {}
+        }
         if s.starts_with("pwm") && !s.starts_with("layer") {
             let parts: Vec<&str> = s.split(':').collect();
             let w: f32 = parts.get(1).and_then(|p| p.parse().ok()).unwrap_or(0.5);
@@ -375,6 +515,26 @@ pub enum Effect {
     AutoPan { rate: f32, depth: f32 },
     Sidechain { threshold: f32, ratio: f32, attack_ms: f32, release_ms: f32 },
     Eq { low_gain: f32, mid_gain: f32, high_gain: f32 },
+    /// DMG NRx2-style envelope: `pace` 0 = hold `initial`; else step every `pace` ticks at 64 Hz.
+    DmgGbEnvelope {
+        initial: u8,
+        increasing: bool,
+        pace: u8,
+    },
+    /// DMG length: 256 Hz countdown; `load` 0–63 (higher = shorter); `enabled` uses hardware length.
+    DmgLength {
+        load: u8,
+        enabled: bool,
+    },
+    /// DMG-style stereo into host mixer (`left`/`right` enable).
+    DmgPan {
+        left: bool,
+        right: bool,
+    },
+    /// CH3 NR32 output level override (0–3).
+    DmgWaveOut {
+        shift: u8,
+    },
 }
 
 impl Effect {
@@ -598,6 +758,54 @@ impl Effect {
                     }
                 }
                 Some(Effect::Eq { low_gain: p(1, 0.0), mid_gain: p(2, 0.0), high_gain: p(3, 0.0) })
+            }
+            "dmgenv" | "dmg_gb_env" => {
+                let initial = parts
+                    .get(1)
+                    .and_then(|x| x.parse::<u8>().ok())
+                    .unwrap_or(15)
+                    .min(15);
+                let increasing = parts.get(2).and_then(|x| x.parse::<u8>().ok()).unwrap_or(0) != 0;
+                let pace = parts
+                    .get(3)
+                    .and_then(|x| x.parse::<u8>().ok())
+                    .unwrap_or(0)
+                    .min(7);
+                Some(Effect::DmgGbEnvelope {
+                    initial,
+                    increasing,
+                    pace,
+                })
+            }
+            "dmglen" | "dmg_length" => {
+                let load = parts
+                    .get(1)
+                    .and_then(|x| x.parse::<u8>().ok())
+                    .unwrap_or(0)
+                    .min(63);
+                let enabled = parts.get(2).and_then(|x| x.parse::<u8>().ok()).unwrap_or(1) != 0;
+                Some(Effect::DmgLength { load, enabled })
+            }
+            "dmgpan" => {
+                let m = parts
+                    .get(1)
+                    .map(|x| x.to_lowercase())
+                    .unwrap_or_default();
+                let (left, right) = match m.as_str() {
+                    "left" | "l" => (true, false),
+                    "right" | "r" => (false, true),
+                    "off" | "mute" | "none" => (false, false),
+                    _ => (true, true),
+                };
+                Some(Effect::DmgPan { left, right })
+            }
+            "dmgout" | "dmgwaveout" => {
+                let shift = parts
+                    .get(1)
+                    .and_then(|x| x.parse::<u8>().ok())
+                    .unwrap_or(1)
+                    .min(3);
+                Some(Effect::DmgWaveOut { shift })
             }
             _ => None,
         }
