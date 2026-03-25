@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="crates/k7-web/logo.png" alt="K7 fantasy console logo" width="280" />
+</div>
+
 # K7 Fantasy Console
 
 A fantasy console that runs games as **WebAssembly** (Wasmtime on native, browser for web) or **Python in the browser** (Pyodide). Display via [pixels](https://github.com/parasyte/pixels) (native) or Canvas 2D (web); audio uses **Survie-inspired** melody notation and a Rust synth in `crates/k7/src/audio/` (see [Audio](#audio) below).
