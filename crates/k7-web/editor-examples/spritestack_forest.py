@@ -4,8 +4,8 @@
 #
 # Top-down world + perspective stacks: trees (line trunk + layered foliage), bushes,
 # optional building stacks, clouds, blob collision, camera follow. Procedural infinite
-# terrain (noise biomes). You play as a duck (sprite body + head). Music is an original
-# chiptune loop (not MP3 pitch-tracking).
+# terrain (noise biomes). You play as a duck; rabbits, frogs, birds, and snails roam.
+# Find 10 tiny ducklings in the world to win. Music is an original chiptune loop.
 
 import js
 import math
@@ -224,16 +224,34 @@ class Blobs(object):
             self.blobs[key] = [p, r * r, False]
 
     def update(self, player):
+        # Circle–circle: overlap when dist < R + r (stored blob[1] is R² from add_blob).
+        Rp = player.r
         for blob in self.blobs.values():
-            d = player.pos.sub(blob[0])
-            l2 = d.len2()
-            if l2 < blob[1] + player.r2:
+            blob[2] = False
+        for _ in range(3):
+            for blob in self.blobs.values():
+                center = blob[0]
+                R = math.sqrt(blob[1])
+                combined = R + Rp
+                combined2 = combined * combined
+                d = player.pos.sub(center)
+                l2 = d.len2()
+                if l2 >= combined2 - 1e-6:
+                    continue
                 blob[2] = True
-                ln = math.sqrt(max(l2, 0.0001))
-                dv = d.div(ln)
-                player.v._add(dv)
-            else:
-                blob[2] = False
+                if l2 < 1e-8:
+                    d = Vec2(1.0, 0.0)
+                    l2 = 1.0
+                dist = math.sqrt(l2)
+                nx = d.x / dist
+                ny = d.y / dist
+                penetration = combined - dist
+                player.pos.x += nx * penetration
+                player.pos.y += ny * penetration
+                vn = player.v.x * nx + player.v.y * ny
+                if vn < 0:
+                    player.v.x -= nx * vn * 1.25
+                    player.v.y -= ny * vn * 1.25
 
 
 class Configuration(object):
@@ -337,10 +355,13 @@ class Bushes(object):
             cam.pos.x % self.cell_size - x * self.cell_size,
             cam.pos.y % self.cell_size - y * self.cell_size,
         )
+        wx = (cells.pos.x + x) * self.cell_size
+        wy = (cells.pos.y + y) * self.cell_size
         for bush in cell.bushes:
             bush.s = bush.pos.sub(cellp.add(self.config.perspective_offset))
             bush.s = bush.s.mul(bush.height * 0.015)
             bush.s._add(bush.pos)
+            blobs.add_blob(Vec2(wx + bush.pos.x, wy + bush.pos.y), bush.r * 0.9)
 
     def draw(self, a, b, cell, cam, shadow):
         if not cell.bushes:
@@ -553,6 +574,14 @@ class Player(object):
         self.c = [4, 10, 3]
 
     def update(self):
+        if TINIES.won():
+            self.v._mul(0.82)
+            if self.v.len() < 0.04:
+                self.v.x = 0
+                self.v.y = 0
+            self.cur_speed = self.v.len()
+            self.pos._add(self.v)
+            return
         v_dif = Vec2(0, 0)
         if k7.btn(0):
             v_dif.x -= self.speed.x
@@ -693,6 +722,191 @@ class Clouds(object):
             k7.circfill(flr(cloud.s.x), flr(cloud.s.y), flr(cloud.r), 7)
 
 
+class Critter(object):
+    KIND_RABBIT = 0
+    KIND_FROG = 1
+    KIND_BIRD = 2
+    KIND_SNAIL = 3
+
+    def __init__(self, kind, x, y):
+        self.kind = kind
+        self.pos = Vec2(x, y)
+        self.v = Vec2(0, 0)
+        self.wander_a = random.random() * 6.2831853
+        self._set_radius()
+
+    def _set_radius(self):
+        base = [3.0, 2.8, 2.0, 2.6][self.kind]
+        self.r = base * (0.85 + random.random() * 0.3)
+
+    def _max_speed(self):
+        return [0.48, 0.38, 0.72, 0.16][self.kind]
+
+    def _damping(self):
+        return [0.88, 0.89, 0.86, 0.93][self.kind]
+
+    def _respawn(self, player):
+        ang = random.random() * 6.2831853
+        rad = random.uniform(96, 300)
+        self.kind = random.randint(0, 3)
+        self.pos = Vec2(
+            player.pos.x + math.cos(ang) * rad,
+            player.pos.y + math.sin(ang) * rad,
+        )
+        self.v = Vec2(0, 0)
+        self.wander_a = random.random() * 6.2831853
+        self._set_radius()
+
+    def update(self, player):
+        max_sp = self._max_speed()
+        d = self.pos.sub(player.pos)
+        dist2 = d.len2()
+        if dist2 < 42 * 42 and dist2 > 1e-6:
+            ln = math.sqrt(dist2)
+            fx = (self.pos.x - player.pos.x) / ln
+            fy = (self.pos.y - player.pos.y) / ln
+            self.v.x += fx * 0.24
+            self.v.y += fy * 0.24
+        else:
+            tid = (flr(self.pos.x) * 31 ^ flr(self.pos.y) * 17) & 255
+            if (frame + tid) % 48 == 0:
+                self.wander_a += random.uniform(-1.1, 1.1)
+            self.v.x += math.cos(self.wander_a) * 0.038
+            self.v.y += math.sin(self.wander_a) * 0.038
+        self.v._mul(self._damping())
+        sp = self.v.len()
+        if sp > max_sp:
+            self.v._mul(max_sp / sp)
+        self.pos._add(self.v)
+        if self.pos.sub(player.pos).len2() > 400 * 400:
+            self._respawn(player)
+
+    def draw_shadow(self):
+        o = SHADOW_OFFSET.mul(self.r * 1.1)
+        rr = max(1, flr(self.r * 0.85))
+        k7.circfill(flr(self.pos.x + o.x), flr(self.pos.y + o.y), rr, 5)
+
+    def draw(self):
+        x, y = self.pos.x, self.pos.y
+        k = self.kind
+        if k == Critter.KIND_RABBIT:
+            rr = max(2, flr(self.r))
+            k7.circfill(flr(x), flr(y), rr, 4)
+            k7.circfill(flr(x - 2), flr(y - rr - 1), 2, 4)
+            k7.circfill(flr(x + 2), flr(y - rr - 1), 2, 4)
+            k7.pset(flr(x + 1), flr(y), 0)
+        elif k == Critter.KIND_FROG:
+            rr = max(2, flr(self.r))
+            k7.circfill(flr(x), flr(y), rr, 11)
+            k7.circfill(flr(x - 2), flr(y - 1), 2, 11)
+            k7.circfill(flr(x + 2), flr(y - 1), 2, 11)
+            k7.circfill(flr(x - 2), flr(y - 1), 1, 7)
+            k7.circfill(flr(x + 2), flr(y - 1), 1, 7)
+            k7.pset(flr(x - 2), flr(y - 1), 0)
+            k7.pset(flr(x + 2), flr(y - 1), 0)
+        elif k == Critter.KIND_BIRD:
+            k7.circfill(flr(x), flr(y), 2, 8)
+            vx, vy = self.v.x, self.v.y
+            if abs(vx) + abs(vy) < 0.04:
+                vx = math.cos(self.wander_a)
+                vy = math.sin(self.wander_a)
+            k7.line(flr(x), flr(y), flr(x - vx * 5), flr(y - vy * 5), 4)
+            k7.line(flr(x), flr(y), flr(x + vy * 2.5), flr(y - vx * 2.5), 14)
+        else:
+            k7.circfill(flr(x - 1), flr(y), max(2, flr(self.r * 0.75)), 9)
+            k7.circfill(flr(x + 2), flr(y + 1), 2, 5)
+            k7.line(flr(x + 3), flr(y + 1), flr(x + 5), flr(y + 2), 5)
+
+
+class TinyDucks(object):
+    """Ten collectible ducklings placed deterministically around spawn (infinite map)."""
+
+    GOAL = 10
+    # Generous pickup vs player body radius ~4.
+    PICKUP_R = 7.0
+
+    def __init__(self, origin):
+        self.positions = []
+        h = int(SEED * 1e9) & 0x7FFFFFFF
+        for i in range(self.GOAL):
+            h = (h * 1103515245 + 12345 + i * 374761393) & 0x7FFFFFFF
+            u = (h % 10001) / 10001.0
+            h = (h * 1103515245 + 12345) & 0x7FFFFFFF
+            v = (h % 10001) / 10001.0
+            ang = (i / float(self.GOAL)) * 6.2831853 + u * 1.45
+            rad = 68 + v * 340
+            self.positions.append(
+                Vec2(origin.x + math.cos(ang) * rad, origin.y + math.sin(ang) * rad)
+            )
+        self.collected = [False] * self.GOAL
+        self.count = 0
+
+    def won(self):
+        return self.count >= self.GOAL
+
+    def try_collect(self, player):
+        if self.won():
+            return
+        pr = self.PICKUP_R + player.r
+        pr2 = pr * pr
+        for i in range(self.GOAL):
+            if self.collected[i]:
+                continue
+            d = player.pos.sub(self.positions[i])
+            if d.len2() < pr2:
+                self.collected[i] = True
+                self.count += 1
+                if self.won():
+                    k7.sfx(13)
+                else:
+                    k7.sfx(12)
+                break
+
+    def draw_shadow(self):
+        for i in range(self.GOAL):
+            if self.collected[i]:
+                continue
+            p = self.positions[i]
+            bob = math.sin(frame * 0.11 + i * 0.63) * 0.45
+            k7.circfill(flr(p.x + 1), flr(p.y + bob + 1), 2, 5)
+
+    def draw(self):
+        for i in range(self.GOAL):
+            if self.collected[i]:
+                continue
+            p = self.positions[i]
+            bob = math.sin(frame * 0.11 + i * 0.63) * 0.45
+            bx, by = p.x, p.y + bob
+            k7.circfill(flr(bx), flr(by), 2, 4)
+            k7.circfill(flr(bx), flr(by - 2), 1, 10)
+            k7.circfill(flr(bx - 1), flr(by - 1), 1, 3)
+            k7.pset(flr(bx), flr(by - 2), 0)
+
+
+class Wildlife(object):
+    def __init__(self, origin, n=26):
+        self.critters = []
+        for _ in range(n):
+            ang = random.random() * 6.2831853
+            rad = random.uniform(40, 240)
+            k = random.randint(0, 3)
+            self.critters.append(
+                Critter(k, origin.x + math.cos(ang) * rad, origin.y + math.sin(ang) * rad)
+            )
+
+    def update(self, player):
+        for c in self.critters:
+            c.update(player)
+
+    def draw_shadows(self):
+        for c in self.critters:
+            c.draw_shadow()
+
+    def draw(self):
+        for c in self.critters:
+            c.draw()
+
+
 # Original forest BGM: layered pads + light percussion (not MP3-derived).
 _FOREST_BGM = (
     "c3:saw|lowpass:dark g2:saw|lowpass:dark e3:triangle c4:square|envelope:perc|hp:bright "
@@ -736,6 +950,8 @@ TREES = Trees(CONFIG)
 BUSHES = Bushes(CONFIG)
 BUILDINGS = Buildings(CONFIG)
 CELLS = Cells(flr(CAM.pos.x / CELL_SIZE), flr(CAM.pos.y / CELL_SIZE), CONFIG, B)
+WILDLIFE = Wildlife(_spawn, 26)
+TINIES = TinyDucks(_spawn)
 
 
 def draw_background():
@@ -767,6 +983,22 @@ def draw_world_solids():
             BUILDINGS.draw(a, b, cell, CAM, False)
 
 
+def draw_wildlife_world(shadow):
+    k7.camera(-flr(CAM.pos.x), -flr(CAM.pos.y))
+    if shadow:
+        WILDLIFE.draw_shadows()
+    else:
+        WILDLIFE.draw()
+
+
+def draw_tiny_ducks_world(shadow):
+    k7.camera(-flr(CAM.pos.x), -flr(CAM.pos.y))
+    if shadow:
+        TINIES.draw_shadow()
+    else:
+        TINIES.draw()
+
+
 def draw_player_world():
     k7.camera(-flr(CAM.pos.x), -flr(CAM.pos.y))
     P.draw_shadow()
@@ -795,6 +1027,8 @@ def init():
     k7.set_sound(9, "c4:triangle|envelope:perc|hp:bright")
     k7.set_sound(10, "e3:triangle|envelope:perc|hp:bright")
     k7.set_sound(11, "g3:triangle|envelope:perc|hp:bright")
+    k7.set_sound(12, "g4:triangle|envelope:perc|hp:bright")
+    k7.set_sound(13, "c5:triangle e5:triangle g5:triangle|envelope:pluck|reverb:small")
 
 
 def update():
@@ -819,7 +1053,9 @@ def update():
             BUSHES.update(x, y, cell, CAM, CELLS, BLOBS)
             BUILDINGS.update(x, y, cell, CAM, CELLS, BLOBS)
     CLOUDS.update(CAM)
+    WILDLIFE.update(P)
     BLOBS.update(P)
+    TINIES.try_collect(P)
 
 
 def draw():
@@ -829,12 +1065,21 @@ def draw():
     draw_world_shadows()
     draw_clouds_world(True)
     draw_world_solids()
+    draw_wildlife_world(True)
+    draw_wildlife_world(False)
+    draw_tiny_ducks_world(True)
+    draw_tiny_ducks_world(False)
     draw_player_world()
     draw_clouds_world(False)
     k7.camera(0, 0)
     k7.set_font("pico8")
     k7.print("duck forest (duck.pik)", 4, 4, 7)
     k7.print("arrows move", 4, 14, 6)
+    k7.print("+ rabbits frogs birds snails", 4, 24, 5)
+    k7.print("find ducklings:%d/10" % TINIES.count, 4, 34, 11)
+    if TINIES.won():
+        k7.print("you win!", 104, 108, 11)
+        k7.print("all 10 found!", 88, 118, 7)
     k7.print("blobs:%d" % BLOBS.len(), 4, H - 12, 5)
     k7.draw_to_canvas(CANVAS_ID)
 
