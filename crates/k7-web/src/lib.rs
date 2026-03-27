@@ -25,6 +25,9 @@ pub struct K7Web {
     #[allow(dead_code)]
     ws_closure: Option<Closure<dyn FnMut(web_sys::MessageEvent)>>,
     audio_engine: RefCell<AudioEngine>,
+    // Cached canvas upload state (avoids DOM/context lookup and ImageData allocation each frame).
+    canvas_id_cache: Option<String>,
+    canvas_ctx_cache: Option<web_sys::CanvasRenderingContext2d>,
 }
 
 #[wasm_bindgen]
@@ -44,7 +47,45 @@ impl K7Web {
             ws_inbox: Rc::new(RefCell::new(Vec::new())),
             ws_closure: None,
             audio_engine: RefCell::new(AudioEngine::new(AUDIO_SAMPLE_RATE)),
+            canvas_id_cache: None,
+            canvas_ctx_cache: None,
         }
+    }
+
+    fn ensure_canvas_cache(&mut self, canvas_id: &str) -> Result<(), JsValue> {
+        let need_rebind = self.canvas_ctx_cache.is_none()
+            || self.canvas_id_cache.as_deref() != Some(canvas_id);
+        if need_rebind {
+            let window = web_sys::window().ok_or("no window")?;
+            let document = window.document().ok_or("no document")?;
+            let canvas = document
+                .get_element_by_id(canvas_id)
+                .ok_or("canvas not found")?
+                .dyn_into::<web_sys::HtmlCanvasElement>()?;
+            let ctx = canvas
+                .get_context("2d")?
+                .ok_or("no context")?
+                .dyn_into::<web_sys::CanvasRenderingContext2d>()?;
+            self.canvas_id_cache = Some(canvas_id.to_string());
+            self.canvas_ctx_cache = Some(ctx);
+        }
+        Ok(())
+    }
+
+    fn draw_to_cached_canvas(&self) -> Result<(), JsValue> {
+        let ctx = self.canvas_ctx_cache.as_ref().ok_or("no context")?;
+        let buf = self.screen.pixel_buffer.as_slice();
+        let len = (SCREEN_WIDTH * SCREEN_HEIGHT * 4) as usize;
+        let buf = if buf.len() >= len { &buf[..len] } else { buf };
+        // Keep allocation here for correctness; `ImageData::data()` from web-sys is a copied buffer,
+        // not a writable live view suitable for in-place reuse.
+        let image_data = web_sys::ImageData::new_with_u8_clamped_array_and_sh(
+            wasm_bindgen::Clamped(buf),
+            SCREEN_WIDTH,
+            SCREEN_HEIGHT,
+        )?;
+        ctx.put_image_data(&image_data, 0.0, 0.0)?;
+        Ok(())
     }
 
     /// WebSocket: connect to URL (e.g. ws://localhost:8080 or wss://…).
@@ -462,26 +503,20 @@ impl K7Web {
 
     /// Draw current frame to canvas (call each frame).
     #[wasm_bindgen]
-    pub fn draw_to_canvas(&self, canvas_id: &str) -> Result<(), JsValue> {
-        let window = web_sys::window().ok_or("no window")?;
-        let document = window.document().ok_or("no document")?;
-        let canvas = document
-            .get_element_by_id(canvas_id)
-            .ok_or("canvas not found")?
-            .dyn_into::<web_sys::HtmlCanvasElement>()?;
-        let ctx = canvas
-            .get_context("2d")?
-            .ok_or("no context")?
-            .dyn_into::<web_sys::CanvasRenderingContext2d>()?;
-        let buf = self.screen.pixel_buffer.as_slice();
-        let len = (SCREEN_WIDTH * SCREEN_HEIGHT * 4) as usize;
-        let buf = if buf.len() >= len { &buf[..len] } else { buf };
-        let image_data = web_sys::ImageData::new_with_u8_clamped_array_and_sh(
-            wasm_bindgen::Clamped(buf),
-            SCREEN_WIDTH,
-            SCREEN_HEIGHT,
-        )?;
-        ctx.put_image_data(&image_data, 0.0, 0.0)?;
-        Ok(())
+    pub fn draw_to_canvas(&mut self, canvas_id: &str) -> Result<(), JsValue> {
+        self.ensure_canvas_cache(canvas_id)?;
+        self.draw_to_cached_canvas()
+    }
+
+    /// Bind a canvas once, then call draw_bound_canvas() each frame to avoid string marshaling.
+    #[wasm_bindgen]
+    pub fn bind_canvas(&mut self, canvas_id: &str) -> Result<(), JsValue> {
+        self.ensure_canvas_cache(canvas_id)
+    }
+
+    /// Draw to the canvas previously bound by bind_canvas().
+    #[wasm_bindgen]
+    pub fn draw_bound_canvas(&self) -> Result<(), JsValue> {
+        self.draw_to_cached_canvas()
     }
 }

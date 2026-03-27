@@ -634,7 +634,7 @@
         <span id="replay-status" style="margin-left:6px;color:#8c8;font-size:0.85rem;"></span>
         <label style="display:inline-flex;align-items:center;gap:4px;color:#aaa;font-size:0.9rem;"><input type="checkbox" id="profiler-toggle" /> Profiler</label>
         <button type="button" id="cheat-sheet-btn" class="btn">Cheat sheet</button>
-        <button type="button" id="share-game-btn" class="btn" title="Encode full game (code, sounds, map, sprites) into URL">Share game</button>
+        <button type="button" id="share-game-btn" class="btn" title="Encode game into URL (compact: deflate + URL-safe base64; preserves other query params)">Share game</button>
         <label for="example-select" style="color:var(--text-muted);font-size:0.9rem;">Example:</label>
         <select id="example-select" class="btn" style="padding:0.35rem 0.5rem;">
           <option value="default">Default</option>
@@ -970,7 +970,7 @@ k7.llm_take_error()     # Returns error message or None</pre>
         </section>
         <section>
           <h3>Shortcuts</h3>
-          <p>Run = click Run. <strong>P = pause/resume</strong> game. <strong>Share game</strong> = encode full game (code, sounds, map, sprites) into the URL and copy link. Code tab: Space = play sound (when Sounds panel active). Hot reload = re-run on code change. Profiler = show FPS/frame time overlay.</p>
+          <p>Run = click Run. <strong>P = pause/resume</strong> game. <strong>Share game</strong> = encode full game into the URL (deflate + URL-safe base64; empty sound slots omitted) and copy link. Code tab: Space = play sound (when Sounds panel active). Hot reload = re-run on code change. Profiler = show FPS/frame time overlay.</p>
           <p>In code: <code>k7.paused()</code> returns 1 if paused, 0 otherwise; <code>k7.toggle_pause()</code> toggles pause. <code>k7.frame()</code> returns the current frame number (incremented each game loop tick) for timing or “once per frame” logic.</p>
         </section>
       </div>
@@ -1063,6 +1063,8 @@ js.game_loop_js = game_loop
       scroller: 'editor-examples/scroller.py',
       phrack_demo: 'editor-examples/phrack_demo.py',
       graffiti: 'editor-examples/graffiti.py',
+      decert_demo: 'editor-examples/decert_demo.py',
+      k7_cart_tools: 'editor-examples/k7_cart_tools.py',
       justice_medley: 'editor-examples/justice_medley.py',
       mp3_transcription_demo: 'editor-examples/mp3_transcription_demo.py',
       fire: 'editor-examples/fire.py',
@@ -3619,6 +3621,16 @@ d4:square e4:square g4:square
       }
       return btoa(bin);
     }
+    /** URL-safe base64: no +/ so query param stays short (no %2B / %2F). */
+    function uint8ArrayToBase64Url(arr) {
+      return uint8ArrayToBase64(arr).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+    }
+    function base64UrlToUint8Array(s) {
+      let b64 = String(s).replace(/-/g, '+').replace(/_/g, '/');
+      const pad = b64.length % 4;
+      if (pad) b64 += '='.repeat(4 - pad);
+      return base64ToUint8Array(b64);
+    }
     async function compressStateJson(jsonStr) {
       if (typeof CompressionStream === 'undefined') return null;
       try {
@@ -3636,6 +3648,144 @@ d4:square e4:square g4:square
         return new TextDecoder().decode(buf);
       } catch (e) { return null; }
     }
+
+    async function decodeCartPayload(encoded) {
+      if (!encoded || typeof encoded !== 'string') return null;
+      try {
+        if (encoded.charAt(0) === 'z') {
+          const compressed = base64UrlToUint8Array(encoded.slice(1));
+          const json = await decompressState(compressed);
+          if (json) return JSON.parse(json);
+          return null;
+        }
+        if (encoded.charAt(0) === 'j') {
+          try {
+            const bytes = base64UrlToUint8Array(encoded.slice(1));
+            return JSON.parse(new TextDecoder().decode(bytes));
+          } catch (e) {
+            try {
+              const json = decodeURIComponent(escape(atob(encoded)));
+              return JSON.parse(json);
+            } catch (e2) {
+              return null;
+            }
+          }
+        }
+        const json = decodeURIComponent(escape(atob(encoded)));
+        return JSON.parse(json);
+      } catch (e) {
+        return null;
+      }
+    }
+
+    async function encodeCartPayloadString(jsonStr) {
+      const utf8 = new TextEncoder().encode(jsonStr);
+      const compressed = await compressStateJson(jsonStr);
+      if (compressed && compressed.length < utf8.length) {
+        return 'z' + uint8ArrayToBase64Url(compressed);
+      }
+      return 'j' + uint8ArrayToBase64Url(utf8);
+    }
+
+    (function initPngCartHelpers() {
+      const CRC_TABLE = new Uint32Array(256);
+      for (let n = 0; n < 256; n++) {
+        let c = n;
+        for (let k = 0; k < 8; k++) {
+          c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+        }
+        CRC_TABLE[n] = c >>> 0;
+      }
+      function crc32Png(u8, start, len) {
+        let crc = 0xffffffff;
+        for (let i = 0; i < len; i++) {
+          crc = CRC_TABLE[(crc ^ u8[start + i]) & 0xff] ^ (crc >>> 8);
+        }
+        return (crc ^ 0xffffffff) >>> 0;
+      }
+      function writeU32BE(arr, off, v) {
+        arr[off] = (v >>> 24) & 0xff;
+        arr[off + 1] = (v >>> 16) & 0xff;
+        arr[off + 2] = (v >>> 8) & 0xff;
+        arr[off + 3] = v & 0xff;
+      }
+      function readU32BE(arr, off) {
+        return ((arr[off] << 24) | (arr[off + 1] << 16) | (arr[off + 2] << 8) | arr[off + 3]) >>> 0;
+      }
+      globalThis._k7PngInsertTextChunk = function pngInsertTextChunk(pngBytes, keyword, textValue) {
+        const enc = new TextEncoder();
+        const kw = enc.encode(keyword);
+        if (kw.length < 1 || kw.length > 79) throw new Error('PNG tEXt keyword length');
+        const val = enc.encode(textValue);
+        const data = new Uint8Array(kw.length + 1 + val.length);
+        data.set(kw, 0);
+        data[kw.length] = 0;
+        data.set(val, kw.length + 1);
+        const typ = new Uint8Array([0x74, 0x45, 0x58, 0x74]);
+        const crcIn = new Uint8Array(4 + data.length);
+        crcIn.set(typ, 0);
+        crcIn.set(data, 4);
+        const crc = crc32Png(crcIn, 0, crcIn.length);
+        const chunk = new Uint8Array(4 + 4 + data.length + 4);
+        writeU32BE(chunk, 0, data.length);
+        chunk.set(typ, 4);
+        chunk.set(data, 8);
+        writeU32BE(chunk, 8 + data.length, crc);
+        const sig = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+        for (let j = 0; j < 8; j++) {
+          if (pngBytes[j] !== sig[j]) throw new Error('Not a PNG file');
+        }
+        let i = 8;
+        while (i < pngBytes.length) {
+          const len = readU32BE(pngBytes, i);
+          const t0 = pngBytes[i + 4];
+          const t1 = pngBytes[i + 5];
+          const t2 = pngBytes[i + 6];
+          const t3 = pngBytes[i + 7];
+          const chunkStart = i;
+          const total = 12 + len;
+          i += total;
+          if (t0 === 0x49 && t1 === 0x45 && t2 === 0x4e && t3 === 0x44) {
+            const out = new Uint8Array(pngBytes.length + chunk.length);
+            out.set(pngBytes.subarray(0, chunkStart), 0);
+            out.set(chunk, chunkStart);
+            out.set(pngBytes.subarray(chunkStart), chunkStart + chunk.length);
+            return out;
+          }
+        }
+        throw new Error('PNG IEND not found');
+      };
+      globalThis._k7PngExtractTextChunk = function pngExtractTextChunk(pngBytes, keyword) {
+        const decKw = new TextDecoder('latin1');
+        const decVal = new TextDecoder('utf-8');
+        let i = 8;
+        while (i < pngBytes.length) {
+          const len = readU32BE(pngBytes, i);
+          const t0 = pngBytes[i + 4];
+          const t1 = pngBytes[i + 5];
+          const t2 = pngBytes[i + 6];
+          const t3 = pngBytes[i + 7];
+          const dataStart = i + 8;
+          if (t0 === 0x74 && t1 === 0x45 && t2 === 0x58 && t3 === 0x74) {
+            const data = pngBytes.subarray(dataStart, dataStart + len);
+            let z = -1;
+            for (let k = 0; k < data.length; k++) {
+              if (data[k] === 0) {
+                z = k;
+                break;
+              }
+            }
+            if (z >= 0) {
+              const kw = decKw.decode(data.subarray(0, z));
+              if (kw === keyword) return decVal.decode(data.subarray(z + 1));
+            }
+          }
+          i += 12 + len;
+        }
+        return null;
+      };
+    })();
+
     async function getStateFromUrl() {
       const params = new URLSearchParams(location.search);
       let encoded = params.get('g');
@@ -3643,18 +3793,34 @@ d4:square e4:square g4:square
         encoded = decodeURIComponent(location.hash.slice(2));
       }
       if (!encoded) return null;
-      try {
-        if (encoded.charAt(0) === 'z') {
-          const compressed = base64ToUint8Array(encoded.slice(1));
-          const json = await decompressState(compressed);
-          if (json) return JSON.parse(json);
-          return null;
-        }
-        const json = decodeURIComponent(escape(atob(encoded)));
-        return JSON.parse(json);
-      } catch (e) {
-        return null;
+      return decodeCartPayload(encoded);
+    }
+
+    async function collectShareStateObject() {
+      const k7 = globalThis.k7;
+      const code = (typeof getCode === 'function') ? getCode() : (document.getElementById('code-fallback')?.value || '');
+      const state = {
+        code,
+        sounds: soundBank ? soundBank.slice() : [],
+        chains: sfxChains ? sfxChains.map(c => c.map(s => ({ slot: s.slot, delay: s.delay }))) : []
+      };
+      if (globalThis.__k7_share_audio_cart != null && typeof globalThis.__k7_share_audio_cart === 'object') {
+        state.audio_cart = globalThis.__k7_share_audio_cart;
       }
+      if (k7 && typeof k7.get_map === 'function') {
+        const mapCells = k7.get_map();
+        const mapFlags = (typeof k7.get_map_flags === 'function') ? k7.get_map_flags() : new Uint8Array(mapCells.length);
+        state.map = uint8ArrayToBase64(new Uint8Array([...mapCells, ...mapFlags]));
+      }
+      if (k7 && typeof k7.get_sprite_sheet === 'function') {
+        const sprites = k7.get_sprite_sheet();
+        state.sprites = uint8ArrayToBase64(sprites);
+      }
+      return state;
+    }
+
+    async function collectShareStateCompact() {
+      return compactShareState(await collectShareStateObject());
     }
     function applyState(state) {
       if (!state) return;
@@ -3720,44 +3886,116 @@ d4:square e4:square g4:square
         }
       }
     }
+    function compactShareState(raw) {
+      const code = typeof raw.code === 'string'
+        ? raw.code.replace(/[ \t]+$/gm, '').replace(/\n+$/, '')
+        : raw.code;
+      const out = { code };
+      if (raw.sounds && raw.sounds.length) {
+        const hasSound = raw.sounds.some(s => s != null && String(s).trim() !== '');
+        if (hasSound) out.sounds = raw.sounds;
+      }
+      if (raw.chains && raw.chains.length) {
+        const hasChain = raw.chains.some(c => Array.isArray(c) && c.length > 0);
+        if (hasChain) out.chains = raw.chains;
+      }
+      if (raw.audio_cart != null && typeof raw.audio_cart === 'object') out.audio_cart = raw.audio_cart;
+      if (raw.map) out.map = raw.map;
+      if (raw.sprites) out.sprites = raw.sprites;
+      return out;
+    }
     async function buildShareUrl() {
-      const k7 = globalThis.k7;
-      const code = (typeof getCode === 'function') ? getCode() : (document.getElementById('code-fallback')?.value || '');
-      const state = {
-        code,
-        sounds: soundBank ? soundBank.slice() : [],
-        chains: sfxChains ? sfxChains.map(c => c.map(s => ({ slot: s.slot, delay: s.delay }))) : []
-      };
-      if (globalThis.__k7_share_audio_cart != null && typeof globalThis.__k7_share_audio_cart === 'object') {
-        state.audio_cart = globalThis.__k7_share_audio_cart;
-      }
-      if (k7 && typeof k7.get_map === 'function') {
-        const mapCells = k7.get_map();
-        const mapFlags = (typeof k7.get_map_flags === 'function') ? k7.get_map_flags() : new Uint8Array(mapCells.length);
-        state.map = uint8ArrayToBase64(new Uint8Array([...mapCells, ...mapFlags]));
-      }
-      if (k7 && typeof k7.get_sprite_sheet === 'function') {
-        const sprites = k7.get_sprite_sheet();
-        state.sprites = uint8ArrayToBase64(sprites);
-      }
-      const json = JSON.stringify(state);
-      let encoded;
-      const compressed = await compressStateJson(json);
-      if (compressed && compressed.length < json.length) {
-        encoded = 'z' + uint8ArrayToBase64(compressed);
-      } else {
-        encoded = btoa(unescape(encodeURIComponent(json)));
-      }
-      const url = location.origin + location.pathname + '?g=' + encodeURIComponent(encoded);
-      location.search = 'g=' + encodeURIComponent(encoded);
+      const json = JSON.stringify(await collectShareStateCompact());
+      const encoded = await encodeCartPayloadString(json);
+      const u = new URL(location.href);
+      u.searchParams.set('g', encoded);
+      history.replaceState(null, '', u.toString());
+      const shareUrl = u.origin + u.pathname + u.search + u.hash;
       try {
-        navigator.clipboard.writeText(url);
-        status('URL updated and copied to clipboard. Share this link to open the full game elsewhere.');
+        navigator.clipboard.writeText(shareUrl);
+        status('URL updated and copied to clipboard (compact share).');
       } catch (e) {
         status('URL updated. Copy the address bar to share.');
       }
     }
+
+    async function exportK7CartPng() {
+      const k7 = globalThis.k7;
+      if (k7 && typeof k7.draw_to_canvas === 'function') {
+        try {
+          k7.draw_to_canvas('k7canvas');
+        } catch (e) {
+          console.warn('draw_to_canvas before export:', e);
+        }
+      }
+      const canvas = document.getElementById('k7canvas');
+      if (!canvas) {
+        status('No canvas to export.');
+        return;
+      }
+      const blob = await new Promise((resolve, reject) => {
+        canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('toBlob failed'))), 'image/png');
+      });
+      const ab = await blob.arrayBuffer();
+      const pngIn = new Uint8Array(ab);
+      let json;
+      try {
+        json = JSON.stringify(await collectShareStateCompact());
+      } catch (e) {
+        status('Failed to build cart: ' + (e?.message || String(e)));
+        return;
+      }
+      const payload = await encodeCartPayloadString(json);
+      let out;
+      try {
+        out = globalThis._k7PngInsertTextChunk(pngIn, 'k7cart', payload);
+      } catch (e) {
+        status('PNG pack failed: ' + (e?.message || String(e)));
+        return;
+      }
+      const outBlob = new Blob([out], { type: 'image/png' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(outBlob);
+      a.download = 'k7-cart.png';
+      a.click();
+      URL.revokeObjectURL(a.href);
+      status('Downloaded k7-cart.png (label + k7cart chunk).');
+    }
+
+    async function importK7CartPngFile(file) {
+      if (!file) return;
+      const ab = await file.arrayBuffer();
+      const u8 = new Uint8Array(ab);
+      let payload;
+      try {
+        payload = globalThis._k7PngExtractTextChunk(u8, 'k7cart');
+      } catch (e) {
+        status('PNG read failed: ' + (e?.message || String(e)));
+        return;
+      }
+      if (!payload) {
+        status('No k7cart chunk in PNG (not a K7 cartridge).');
+        return;
+      }
+      const state = await decodeCartPayload(payload.trim());
+      if (!state) {
+        status('Invalid k7cart payload.');
+        return;
+      }
+      applyState(state);
+      status('Loaded K7 cart from PNG. Click Run to play.');
+    }
+
     document.getElementById('share-game-btn')?.addEventListener('click', () => buildShareUrl());
+    document.getElementById('export-cart-png-btn')?.addEventListener('click', () => exportK7CartPng());
+    document.getElementById('import-cart-png-btn')?.addEventListener('click', () => {
+      document.getElementById('k7-cart-png-file')?.click();
+    });
+    document.getElementById('k7-cart-png-file')?.addEventListener('change', (ev) => {
+      const f = ev.target.files && ev.target.files[0];
+      if (f) importK7CartPngFile(f).catch((e) => { status('Import error: ' + (e?.message || String(e))); });
+      ev.target.value = '';
+    });
 
     main();
   </script>
